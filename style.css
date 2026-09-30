@@ -88,6 +88,11 @@ code{font-family:var(--mono);font-size:.92em}
 .subtabs button:hover{border-color:var(--gold)}
 .subtabs button[aria-selected="true"]{background:var(--gold);border-color:var(--gold);color:#20160A}
 
+.trib-subtabs{margin-bottom:22px}
+.trib-vista .empty{font-size:14.5px;padding:18px 0}
+.src-link{font-family:var(--mono);font-size:11px;white-space:nowrap}
+#trib-table td.label{max-width:360px;white-space:normal}
+
 /* Rankings */
 .rank-grid{display:grid;grid-template-columns:1fr 1fr;gap:26px}
 .rank-grid.special{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}

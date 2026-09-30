@@ -96,6 +96,38 @@ que ajustar el mapeo antes de construir. Después corré
 `python3 build_data.py --requerir-2027`: con esa opción, el build falla si
 falta la fuente del Proyecto, como exige la especificación.
 
+## Solapa Tributario
+
+Compara la Ley Impositiva de CABA (alícuotas, mínimos, montos y umbrales) entre
+2023 y 2026, en la misma página, sin mezclarse con las vistas de Presupuesto:
+reutiliza sólo el año A/año B y el modo real/nominal, que tienen el mismo
+sentido en ambos módulos. Construida siguiendo el *Manual de implementación
+del módulo tributario CABA* (v1.0, set. 2026), en la fase 1: sólo la vista
+**Ley Impositiva** está activa; Resumen, Código Fiscal, Ley Arancelaria y
+Agenda prioritaria quedan como "próximamente" hasta que haya una extracción
+propia de esas normas (piden un motor de correlación oficial de artículos y
+un parser de Unidad Tributaria que todavía no existen).
+
+- **Fuente**: `fuentes_tributario/ley_impositiva_caba_base_2026.csv` (una fila
+  por año y concepto, con artículo y fuente oficial) y
+  `fuentes_tributario/plantilla_ley_impositiva_caba.xlsx` (hoja "Plantilla":
+  el mismo universo ya agrupado a través de los años, resolviendo cambios de
+  redacción o numeración). Ambos son chicos y sí se versionan.
+- **Build**: `python3 build_tributario_data.py` (requiere `openpyxl`) genera
+  `data/tributario/package.json` y `data/tributario/tax-values.json`. Vuelve
+  a vincular cada valor de la Plantilla con su artículo y fuente originales
+  por coincidencia de texto; una celda sin coincidencia confiable queda sin
+  cita (nunca inventa una referencia). Imprime la tasa de cobertura lograda.
+- **Cuando se publique la Ley Impositiva 2027**: agregar las filas 2027 a
+  `ley_impositiva_caba_base_2026.csv` y a la columna "Valor 2027" de la
+  Plantilla (o reconstruir esa planilla), correr de nuevo el build de
+  Tributario y el de Presupuesto, y commitear los JSON resultantes.
+- Reglas de cálculo (no se apartan del *Manual*): alícuotas en puntos
+  porcentuales, nunca variación porcentual; montos con variación nominal o
+  real (mismo IPC promedio que usa `build_data.py`); una base en $0 se marca
+  "Alta desde $0", nunca un porcentaje infinito; un dato ausente se muestra
+  como pendiente, nunca como cero.
+
 ## Publicación en GitHub Pages
 
 Subí el contenido de la carpeta (sin `fuentes/*.csv`) a la rama `main`, y

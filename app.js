@@ -8,6 +8,7 @@
   'use strict';
   const M = window.Metrics;
   let D = null;
+  let TD = null; // datos de data/tributario/*.json (solapa Tributario)
   const charts = {};
 
   const DIM_NAME = { jur: 'Jurisdicción', fun: 'Función', inc: 'Inciso', geo: 'Comuna o ubicación' };
@@ -24,6 +25,7 @@
     tableDim: 'jur', tableSearch: '', tableTop: 'all', tableZero: false, tableSort: { col: 'abs', dir: 'desc' },
     evoDim: 'total', evoSel: null,
     comSel: null, comDetDim: 'jur',
+    tribVista: 'impositiva', tribTax: '', tribType: '', tribSearch: '', tribPending: false,
   };
 
   const $ = id => document.getElementById(id);
@@ -59,6 +61,12 @@
   function chip(y) {
     const cls = y === state.a ? 'a' : y === state.b ? 'b' : 'plain';
     return `<span class="yr ${cls}">${esc(yearLabel(y))}</span>`;
+  }
+  // Como chip(), pero sin "Vigente"/"Proyecto": esa distinción es del Presupuesto y no
+  // aplica a la Ley Impositiva (no tiene versión "Vigente" vs. "Proyecto" por año).
+  function tribChip(y) {
+    const cls = y === state.a ? 'a' : y === state.b ? 'b' : 'plain';
+    return `<span class="yr ${cls}">${y}</span>`;
   }
   const modeWord = (m = state.mode) => m === 'real' ? 'real' : 'nominal';
   const varUnit = (m = state.mode) => m === 'real'
@@ -117,14 +125,26 @@
     if (state.a === state.b) { state.a = D.meta.default_base_year; state.b = D.meta.default_compared_year; }
     if (p.get('modo') === 'nominal' || p.get('modo') === 'real') state.mode = p.get('modo');
     for (const d of ['jur', 'fun', 'inc', 'geo']) if (p.get(d) && D.label[d][p.get(d)]) state.filters[d] = p.get(d);
-    if (['comparacion', 'evolucion', 'comunas'].includes(p.get('tab'))) state.tab = p.get('tab');
+    if (['comparacion', 'evolucion', 'comunas', 'tributario'].includes(p.get('tab'))) state.tab = p.get('tab');
     if (['total', 'jur', 'fun', 'inc', 'geo'].includes(p.get('evo'))) state.evoDim = p.get('evo');
+    if (['resumen', 'codigo_fiscal', 'impositiva', 'arancelaria', 'agenda'].includes(p.get('vista'))) state.tribVista = p.get('vista');
+    if (p.get('timp')) state.tribTax = p.get('timp');
+    if (p.get('ttipo')) state.tribType = p.get('ttipo');
+    if (p.get('tq')) state.tribSearch = p.get('tq');
+    if (p.get('tpend') === '1') state.tribPending = true;
   }
   function writeURL() {
     const p = new URLSearchParams();
     p.set('tab', state.tab); p.set('a', state.a); p.set('b', state.b); p.set('modo', state.mode);
     for (const d of ['jur', 'fun', 'inc', 'geo']) if (state.filters[d]) p.set(d, state.filters[d]);
     if (state.tab === 'evolucion' && state.evoDim !== 'total') p.set('evo', state.evoDim);
+    if (state.tab === 'tributario') {
+      if (state.tribVista !== 'impositiva') p.set('vista', state.tribVista);
+      if (state.tribTax) p.set('timp', state.tribTax);
+      if (state.tribType) p.set('ttipo', state.tribType);
+      if (state.tribSearch) p.set('tq', state.tribSearch);
+      if (state.tribPending) p.set('tpend', '1');
+    }
     try { history.replaceState(null, '', location.pathname + '?' + p.toString()); } catch (e) { /* sin history */ }
   }
 
@@ -167,6 +187,15 @@
     $('to-evo-geo').addEventListener('click', () => { state.tab = 'evolucion'; state.evoDim = 'geo'; state.evoSel = null; update(); window.scrollTo({ top: 0 }); });
     $('com-sel').addEventListener('change', e => { state.comSel = e.target.value; renderComunaDetail(); markComunaRow(); });
     bindTabs('com-det-tabs', 'dim', v => { state.comDetDim = v; });
+
+    if (TD) {
+      bindTabs('trib-tabs', 'vista', v => { state.tribVista = v; });
+      $('trib-f-tax').addEventListener('change', e => { state.tribTax = e.target.value; update(); });
+      $('trib-f-type').addEventListener('change', e => { state.tribType = e.target.value; update(); });
+      $('trib-search').addEventListener('input', e => { state.tribSearch = e.target.value; renderTribImpositiva(); });
+      $('trib-f-pending').addEventListener('change', e => { state.tribPending = e.target.checked; renderTribImpositiva(); });
+      $('trib-export-csv').addEventListener('click', exportTribCSV);
+    }
   }
 
   function bindTabs(id, attr, set) {
@@ -184,16 +213,28 @@
   function syncControls() {
     $('year-a').value = state.a; $('year-b').value = state.b;
     const evo = state.tab === 'evolucion';
+    const trib = state.tab === 'tributario';
     $('years-box').classList.toggle('is-disabled', evo);
     $('year-a').disabled = evo; $('year-b').disabled = evo;
     $('years-note').innerHTML = evo
       ? 'En Evolución se muestran todos los años.'
-      : `La variación va de ${chip(state.a)} a ${chip(state.b)}.`;
+      : trib ? `Impositiva compara ${tribChip(state.a)} con ${tribChip(state.b)}.` : `La variación va de ${chip(state.a)} a ${chip(state.b)}.`;
     for (const b of $('mode-seg').querySelectorAll('button')) { const on = b.dataset.mode === state.mode; b.setAttribute('aria-checked', on); b.tabIndex = on ? 0 : -1; }
     const setSel = (id, attr, val) => { for (const b of $(id).querySelectorAll('button')) b.setAttribute('aria-selected', b.dataset[attr] === val); };
     setSel('main-tabs', 'tab', state.tab); setSel('comp-tabs', 'dim', state.compDim); setSel('cross-tabs', 'cross', state.cross); setSel('com-det-tabs', 'dim', state.comDetDim);
-    for (const t of ['comparacion', 'evolucion', 'comunas']) $('panel-' + t).hidden = state.tab !== t;
+    for (const t of ['comparacion', 'evolucion', 'comunas', 'tributario']) $('panel-' + t).hidden = state.tab !== t;
     $('rank-dim').value = state.rankDim; $('rank-order').value = state.rankOrder; $('evo-dim').value = state.evoDim;
+
+    // Los filtros de Jurisdicción/Función/Inciso/Comuna son del Presupuesto: no aplican a Tributario.
+    for (const d of ['jur', 'fun', 'inc', 'geo']) $('f-' + d).closest('label').hidden = trib;
+    $('clear-filters').hidden = trib;
+
+    if (trib && TD) {
+      setSel('trib-tabs', 'vista', state.tribVista);
+      $('trib-f-tax').value = state.tribTax; $('trib-f-type').value = state.tribType; $('trib-f-pending').checked = state.tribPending;
+      if ($('trib-search').value !== state.tribSearch) $('trib-search').value = state.tribSearch;
+      for (const v of ['resumen', 'codigo_fiscal', 'impositiva', 'arancelaria', 'agenda']) $('trib-' + v).hidden = state.tribVista !== v;
+    }
 
     // Opciones de filtro: claves con monto en algún año visible (A y B, o todos en Evolución).
     const ys = evo ? D.years : [state.a, state.b];
@@ -219,13 +260,13 @@
   }
 
   function renderHeader() {
-    const t = state.tab === 'evolucion'
-      ? `Evolución ${D.years[0]}–${D.years[D.years.length - 1]}`
+    const t = state.tab === 'evolucion' ? `Evolución ${D.years[0]}–${D.years[D.years.length - 1]}`
+      : state.tab === 'tributario' ? `Tributario: ${state.b} vs. ${state.a}`
       : `${yearLabel(state.b)} vs. ${yearLabel(state.a)}`;
     $('page-title').textContent = state.tab === 'comunas' ? 'Comunas: ' + t : t;
     document.title = $('page-title').textContent + ' · Presupuesto CABA';
     $('mode-badge').textContent = state.mode === 'real' ? `Variaciones reales (precios de ${PB()})` : 'Variaciones nominales';
-    $('pending-note').hidden = !!D.meta.proyecto_2027_disponible;
+    $('pending-note').hidden = !!D.meta.proyecto_2027_disponible || state.tab === 'tributario';
     document.querySelectorAll('.js-ya').forEach(e => { e.innerHTML = chip(state.a); });
     document.querySelectorAll('.js-yb').forEach(e => { e.innerHTML = chip(state.b); });
     document.querySelectorAll('.js-range').forEach(e => { e.textContent = `${D.years[0]}–${D.years[D.years.length - 1]}`; });
@@ -669,14 +710,156 @@
     $('com-det-table').innerHTML = head + `<tbody>${body || '<tr><td colspan="8" class="empty">Sin montos.</td></tr>'}</tbody>`;
   }
 
+  /* =============== TRIBUTARIO (Ley Impositiva) =============== *
+   * Consume data/tributario/{package,tax-values}.json. Sólo la vista Ley
+   * Impositiva está construida; Resumen, Código Fiscal, Ley Arancelaria y
+   * Agenda prioritaria quedan como "próximamente" (ver index.html).
+   * Reglas de comparación (Manual de implementación, sección 6.2):
+   *   - Alícuota: variación en puntos porcentuales, nunca en % .
+   *   - Monto: variación nominal y real (mismo IPC promedio que Presupuesto).
+   *   - Base cero: se informa "alta desde $0", nunca un % infinito.
+   *   - Dato ausente: se muestra como tal, nunca como cero.
+   */
+  const TRIB_PCT_UNITS = new Set(['%', '% de reducción']);
+  const TRIB_MONEY_UNITS = new Set(['$', '$/año']);
+
+  function tribVariation(c, yA, yB, mode) {
+    const vA = c.values[yA], vB = c.values[yB];
+    if (vA == null || vB == null) return { kind: 'missing' };
+    if (TRIB_PCT_UNITS.has(c.unit)) return { kind: 'pp', pp: vB - vA };
+    if (TRIB_MONEY_UNITS.has(c.unit)) {
+      if (vA === 0) return vB === 0 ? { kind: 'same-zero' } : { kind: 'from-zero' };
+      const nominalPct = (vB / vA - 1) * 100;
+      if (mode === 'real') {
+        const ipcA = TD.pkg.ipcPromedio[yA], ipcB = TD.pkg.ipcPromedio[yB];
+        if (!ipcA || !ipcB) return { kind: 'pct', pct: null };
+        return { kind: 'pct', pct: ((vB / vA) * (ipcA / ipcB) - 1) * 100 };
+      }
+      return { kind: 'pct', pct: nominalPct };
+    }
+    return { kind: 'raw' };
+  }
+  function tribValueText(c, y) {
+    const v = c.values[y];
+    if (v == null) return '—';
+    if (TRIB_PCT_UNITS.has(c.unit)) return nf(+v, 2).replace(/,00$/, '') + ' %';
+    if (TRIB_MONEY_UNITS.has(c.unit)) return fmtFull(+v);
+    if (c.unit === 'factor') return nf(+v, 2).replace(/,00$/, '') + '×';
+    return String(v);
+  }
+  function tribVarText(v) {
+    if (v.kind === 'missing') return '<span class="muted">Pendiente</span>';
+    if (v.kind === 'same-zero') return '<span class="muted">Sigue en $0</span>';
+    if (v.kind === 'from-zero') return '<span class="up-text">Alta desde $0</span>';
+    if (v.kind === 'pp') return `<span class="${dirClass(v.pp)}">${arrow(v.pp)} ${fmtPP(v.pp)}</span>`;
+    if (v.kind === 'pct') return v.pct == null ? '<span class="muted">No aplica</span>' : `<span class="${dirClass(v.pct)}">${arrow(v.pct)} ${fmtPct(v.pct)}</span>`;
+    return '<span class="muted">Sin variación calculada</span>';
+  }
+
+  function tribFiltered() {
+    const q = fold(state.tribSearch.trim());
+    return TD.concepts.filter(c =>
+      (!state.tribTax || c.tax === state.tribTax) &&
+      (!state.tribType || c.valueType === state.tribType) &&
+      (!state.tribPending || c.reviewStatus === 'pending_review') &&
+      (!q || fold(c.tax + ' ' + c.concept).includes(q)));
+  }
+
+  function renderTributario() {
+    const cov = TD.pkg.coverage;
+    $('trib-coverage').innerHTML = `Ley Impositiva 2023–2026 (Código Fiscal, Ley Arancelaria y Agenda prioritaria: próximamente). ${cov.conceptos} conceptos, ${cov.valoresTotales} valores-año, ${cov.valoresConFuenteVinculada} con artículo/fuente vinculado. Generado ${new Date(TD.pkg.generatedAt).toLocaleString('es-AR')}.`;
+    if (state.tribVista === 'impositiva') renderTribImpositiva();
+  }
+
+  function renderTribImpositiva() {
+    const a = String(state.a), b = String(state.b), m = state.mode;
+    $('trib-mode-word').textContent = m === 'real' ? 'reales' : 'nominales';
+    $('trib-ya').innerHTML = tribChip(state.a);
+    $('trib-yb').innerHTML = tribChip(state.b);
+
+    const taxSel = $('trib-f-tax');
+    if (!taxSel.dataset.filled) {
+      taxSel.innerHTML = '<option value="">Todos</option>' + TD.pkg.taxes.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+      taxSel.dataset.filled = '1';
+    }
+    const typeSel = $('trib-f-type');
+    if (!typeSel.dataset.filled) {
+      const types = [...new Set(TD.concepts.map(c => c.valueType))];
+      typeSel.innerHTML = '<option value="">Todos</option>' + types.map(t => `<option value="${esc(t)}">${esc(TD.concepts.find(c => c.valueType === t).valueTypeLabel)}</option>`).join('');
+      typeSel.dataset.filled = '1';
+    }
+
+    const rows = tribFiltered().slice().sort((x, y) => x.tax.localeCompare(y.tax, 'es') || x.concept.localeCompare(y.concept, 'es'));
+    $('trib-table-unit').innerHTML = `${rows.length} de ${TD.concepts.length} conceptos. ${tribChip(state.a)} → ${tribChip(state.b)}.`;
+
+    const sourceCell = (c, y) => {
+      const r = c.refs[y];
+      if (!r) return '';
+      const art = r.articulo ? esc(r.articulo) : '';
+      const isUrl = r.fuente && /^https:\/\//.test(r.fuente);
+      if (isUrl) return ` <a class="src-link" href="${esc(r.fuente)}" target="_blank" rel="noopener">${art || 'fuente'}</a>`;
+      return art ? ` <span class="muted" title="${esc(r.fuente || '')}">${art}</span>` : '';
+    };
+    const body = rows.map(c => {
+      const v = tribVariation(c, a, b, m);
+      const badge = c.reviewStatus === 'pending_review'
+        ? '<span class="estado eliminada" title="Hay algo de este concepto a verificar: ver la nota.">A verificar</span>'
+        : '<span class="estado nueva" title="Sin pendientes de verificación conocidos.">Confirmado</span>';
+      return `<tr>
+        <td class="label" title="${esc(c.concept)}">${esc(c.concept)}${c.note ? `<br><span class="muted" style="font-size:12px" title="${esc(c.note)}">${esc(c.note.length > 90 ? c.note.slice(0, 87) + '…' : c.note)}</span>` : ''}</td>
+        <td>${esc(c.tax)}</td>
+        <td>${esc(c.valueTypeLabel)}</td>
+        <td class="num">${tribValueText(c, a)}${sourceCell(c, a)}</td>
+        <td class="num">${tribValueText(c, b)}${sourceCell(c, b)}</td>
+        <td class="num">${tribVarText(v)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+    $('trib-table').innerHTML = `<thead><tr><th>Concepto</th><th>Impuesto</th><th>Tipo</th><th class="num">${tribChip(state.a)}</th><th class="num">${tribChip(state.b)}</th><th class="num">Variación</th><th>Estado</th></tr></thead>
+      <tbody>${body || '<tr><td colspan="7" class="empty">Sin conceptos para este filtro o búsqueda.</td></tr>'}</tbody>`;
+  }
+
+  function exportTribCSV() {
+    const a = String(state.a), b = String(state.b), m = state.mode;
+    const q = v => { const s = v == null ? '' : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const header = ['impuesto', 'concepto', 'tipo_valor', 'unidad', `valor_${a}`, `articulo_${a}`, `fuente_${a}`, `valor_${b}`, `articulo_${b}`, `fuente_${b}`, 'variacion', 'estado_revision', 'nota'];
+    const out = [header];
+    for (const c of tribFiltered()) {
+      const v = tribVariation(c, a, b, m);
+      const varTxt = v.kind === 'pp' ? (v.pp == null ? '' : v.pp.toFixed(2) + ' pp')
+        : v.kind === 'pct' ? (v.pct == null ? '' : v.pct.toFixed(2) + ' %')
+        : v.kind === 'from-zero' ? 'alta desde 0' : v.kind === 'same-zero' ? 'sigue en 0' : 'pendiente';
+      out.push([c.tax, c.concept, c.valueType, c.unit,
+        c.values[a] ?? '', c.refs[a]?.articulo ?? '', c.refs[a]?.fuente ?? '',
+        c.values[b] ?? '', c.refs[b]?.articulo ?? '', c.refs[b]?.fuente ?? '',
+        varTxt, c.reviewStatus, c.note ?? '']);
+    }
+    const csv = '﻿' + out.map(r => r.map(q).join(',')).join('\r\n');
+    saveFile(`tributario_ley_impositiva_${a}_a_${b}.csv`, new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  }
+
   /* ---------------- ciclo ---------------- */
   function update() {
     cache = null;
     syncControls(); renderHeader();
     if (state.tab === 'comparacion') { renderKPIs(); renderRankings(); renderComposition(); renderCross(); renderTable(); }
     else if (state.tab === 'evolucion') renderEvolucion();
-    else renderComunas();
+    else if (state.tab === 'comunas') renderComunas();
+    else if (state.tab === 'tributario') renderTributario();
     writeURL();
+  }
+
+  async function loadTributario() {
+    try {
+      const [pkg, values] = await Promise.all([
+        fetch('data/tributario/package.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+        fetch('data/tributario/tax-values.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+      ]);
+      TD = { pkg, concepts: values.concepts };
+    } catch (err) {
+      TD = null; // la solapa Tributario se deshabilita, el resto del tablero sigue funcionando
+      console.warn('No se pudieron cargar los datos de Tributario:', err.message);
+    }
   }
 
   async function init() {
@@ -684,8 +867,11 @@
       const json = window.__PRESUPUESTO__ || await fetch('presupuesto.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
       D = M.decode(json);
       state.a = D.meta.default_base_year; state.b = D.meta.default_compared_year;
+      await loadTributario();
       readURL();
       buildControls();
+      $('tab-tributario').hidden = !TD;
+      if (!TD && state.tab === 'tributario') state.tab = 'comparacion';
       $('status').hidden = true; $('app').hidden = false;
       update();
     } catch (err) {

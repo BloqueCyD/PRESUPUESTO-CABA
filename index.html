@@ -64,6 +64,7 @@
   <button type="button" role="tab" id="tab-comparacion" aria-controls="panel-comparacion" data-tab="comparacion" aria-selected="true">Comparación entre dos años</button>
   <button type="button" role="tab" id="tab-evolucion" aria-controls="panel-evolucion" data-tab="evolucion" aria-selected="false">Evolución <span class="js-range">2023–2026</span></button>
   <button type="button" role="tab" id="tab-comunas" aria-controls="panel-comunas" data-tab="comunas" aria-selected="false">Comunas</button>
+  <button type="button" role="tab" id="tab-tributario" aria-controls="panel-tributario" data-tab="tributario" aria-selected="false">Tributario</button>
 </nav>
 
 <div id="status" class="status wrap" role="status" aria-live="polite">Cargando datos…</div>
@@ -244,6 +245,57 @@
         <h2 id="h-com-other">Otras ubicaciones registradas</h2>
         <p class="unit-line">Ubicaciones geográficas del presupuesto que no llevan el nombre de una comuna.</p>
         <div class="table-scroll"><table class="data-table" id="com-other"></table></div>
+      </section>
+    </main>
+  </section>
+
+  <!-- ===================== TRIBUTARIO ===================== -->
+  <section id="panel-tributario" role="tabpanel" aria-labelledby="tab-tributario" hidden>
+    <main class="wrap stack">
+      <div class="trib-intro">
+        <p class="unit-line" id="trib-coverage"></p>
+      </div>
+      <nav class="subtabs trib-subtabs" role="tablist" aria-label="Vistas del paquete tributario" id="trib-tabs">
+        <button type="button" role="tab" data-vista="resumen" aria-selected="false">Resumen</button>
+        <button type="button" role="tab" data-vista="codigo_fiscal" aria-selected="false">Código Fiscal</button>
+        <button type="button" role="tab" data-vista="impositiva" aria-selected="true">Ley Impositiva</button>
+        <button type="button" role="tab" data-vista="arancelaria" aria-selected="false">Ley Arancelaria</button>
+        <button type="button" role="tab" data-vista="agenda" aria-selected="false">Agenda prioritaria</button>
+      </nav>
+
+      <!-- ---- Ley Impositiva (única vista activa en esta versión) ---- -->
+      <section class="card trib-vista" id="trib-impositiva" aria-labelledby="h-trib-imp">
+        <div class="card-head">
+          <h2 id="h-trib-imp">Ley Impositiva: alícuotas, mínimos y montos</h2>
+          <button type="button" class="btn" id="trib-export-csv">Descargar CSV</button>
+        </div>
+        <p class="unit-line">Compara <span id="trib-ya"></span> con <span id="trib-yb"></span> (años elegidos arriba, en Comparar). Las alícuotas se comparan en puntos porcentuales, nunca en variación porcentual. Los montos en pesos se comparan en variación nominal o real (<span id="trib-mode-word"></span>), con el mismo IPC promedio anual que usa el módulo de Presupuesto. Un dato ausente se muestra como tal: nunca se convierte en cero.</p>
+        <div class="cross-controls">
+          <label class="field inline grow"><span>Impuesto</span><select id="trib-f-tax"></select></label>
+          <label class="field inline grow"><span>Tipo de valor</span><select id="trib-f-type"></select></label>
+          <label class="field inline grow"><span>Buscar concepto</span><input type="search" id="trib-search" placeholder="ej: sellos, patentes, mínimo" autocomplete="off"></label>
+          <label class="check"><input type="checkbox" id="trib-f-pending"> Sólo con algo a verificar</label>
+        </div>
+        <p class="unit-line" id="trib-table-unit"></p>
+        <div class="table-scroll table-tall"><table class="data-table" id="trib-table"></table></div>
+      </section>
+
+      <!-- ---- Vistas todavía no construidas ---- -->
+      <section class="card trib-vista" id="trib-resumen" hidden>
+        <h2>Resumen</h2>
+        <p class="empty">Próximamente: estado de recepción de los cuatro proyectos normativos, cambios prioritarios confirmados y pendientes. Por ahora, ver la vista Ley Impositiva.</p>
+      </section>
+      <section class="card trib-vista" id="trib-codigo_fiscal" hidden>
+        <h2>Código Fiscal</h2>
+        <p class="empty">Próximamente: comparador artículo por artículo del Código Fiscal (texto ordenado y Anexos I-V), con correlación oficial entre numeraciones y diferencia de texto resaltada.</p>
+      </section>
+      <section class="card trib-vista" id="trib-arancelaria" hidden>
+        <h2>Ley Arancelaria</h2>
+        <p class="empty">Próximamente: valor de la Unidad Tributaria (UT) y conceptos arancelarios por organismo, separando el cambio en cantidad de UT del cambio en el valor monetario de la UT.</p>
+      </section>
+      <section class="card trib-vista" id="trib-agenda" hidden>
+        <h2>Agenda prioritaria</h2>
+        <p class="empty">Próximamente: cruce de hallazgos de Código Fiscal, Ley Impositiva y Ley Arancelaria por tema, con prioridad y estado editorial.</p>
       </section>
     </main>
   </section>
