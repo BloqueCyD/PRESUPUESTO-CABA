@@ -8,7 +8,7 @@
 | 2024 | Vigente | ídem | T4 | `Vigente` | 48.514 |
 | 2025 | Vigente | ídem | T4 | `Vigente` | 45.444 |
 | 2026 | Vigente | ídem | T2 | `Vigente` | 38.756 |
-| 2027 | Proyecto | pendiente de entrega | — | — | — |
+| 2027 | Proyecto | `presupuesto_2027_tablero.csv` | Crédito inicial (Proyecto de Ley) | `Credito_Inicial` | 776 (tres cruces) |
 
 El CSV también trae `Sanción`, `Definitivo`, `Devengado`, `IPC_promedio`,
 `factor_a_precios_2027` y `Vigente_real_2027`. El build **no lee** Sanción,
@@ -26,6 +26,18 @@ Totales nominales de la fuente (columna `Vigente`):
 | 2024 | $ 10.411.643.914.333 | $ 24.275.214.824.450 |
 | 2025 | $ 14.752.026.974.205 | $ 23.493.775.848.245 |
 | 2026 | $ 20.878.860.043.433 | $ 25.202.906.039.414 |
+| 2027 | $ 24.094.340.599.263 | $ 24.094.340.599.263 (factor 1) |
+
+### Proyecto 2027 (formato cruces)
+
+Columnas: `anio`, `etapa`, `cruce`, `Jur`, `Desc_Jur`, `Fin`, `Desc_Fin`,
+`Fun`, `Desc_Fun`, `Inciso`, `Desc_Inc`, `Credito_Inicial`,
+`fuente_planilla`, `pagina_pdf`. Cada fila es una celda de uno de tres
+cruces (`cruce`): `funcion_inciso` (Planilla 3), `jurisdiccion_inciso`
+(Planilla 4) y `jurisdiccion_funcion` (Planilla 8). Las columnas de la
+dimensión que no participa del cruce vienen vacías; el build falla si no es
+así, si aparece un cruce desconocido, si falta alguno o si una celda se
+repite. No hay columna de ubicación geográfica.
 
 ## Dimensiones y claves
 
@@ -46,23 +58,27 @@ No se aplica ninguna equivalencia entre códigos distintos
 (`EQUIVALENCIAS` vacío). Las claves que sólo tienen monto en algunos años se
 listan en `meta.review.presencia_parcial`.
 
-## `presupuesto.json` (schema_version 3)
+## `presupuesto.json` (schema_version 4)
 
 ```json
 {
   "meta": {
-    "schema_version": 3, "generated_at": "…", "price_base": 2027,
-    "compared_year_spec": 2027, "default_compared_year": 2026, "default_base_year": 2025,
-    "proyecto_2027_disponible": false,
+    "schema_version": 4, "generated_at": "…", "price_base": 2027,
+    "compared_year_spec": 2027, "default_compared_year": 2027, "default_base_year": 2026,
+    "proyecto_2027_disponible": true,
     "ipc_average": {"2023": 397.16, "2024": 1295.33, "2025": 1896.37, "2026": 2501.96, "2027": 3020.12},
     "factor_a_precios_2027": {"2023": 7.604…, …, "2027": 1.0},
-    "periods": [{"periodo": 2023, "tipo_presupuesto": "vigente", "version_fuente": "T4"}, …],
+    "periods": [{"periodo": 2023, "tipo_presupuesto": "vigente", "version_fuente": "T4", "grano": "completo"}, …,
+                {"periodo": 2027, "tipo_presupuesto": "proyecto", "version_fuente": "Crédito inicial",
+                 "grano": "cruces", "cruces": ["jur_fun", "jur_inc", "fun_inc"]}],
     "sources": [{"periodo", "tipo_presupuesto", "archivo", "version_fuente", "columna_monto",
                  "filas_leidas", "filas_descartadas", "filas_monto_cero", "filas_monto_negativo",
                  "filas_sin_dato", "total_nominal", "sha256"}, …],
     "validation_summary": {"ok": true, "controles": […], "advertencias": […]},
     "review": {"etiquetas": […], "presencia_parcial": […], "equivalencias_aplicadas": {…}},
-    "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "geo_idx", "monto_nominal", "monto_real_2027"]
+    "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "geo_idx", "monto_nominal", "monto_real_2027"],
+    "cross_row_format": ["periodo_idx", "cruce", "jur_idx", "fun_idx", "inc_idx", "monto_nominal", "monto_real_2027"],
+    "cross_dims": {"jur_fun": ["jur", "fun"], "jur_inc": ["jur", "inc"], "fun_inc": ["fun", "inc"]}
   },
   "dimensions": {
     "periodos": [2023, 2024, 2025, 2026],
@@ -71,7 +87,8 @@ listan en `meta.review.presencia_parcial`.
     "incisos": [{"id": "1", "label": "…"}, …],
     "ubicaciones": [{"id": "1", "label": "Comuna 1"}, …]
   },
-  "rows": [[0, 0, 0, 0, 0, 1234.0, 9383.6], …]
+  "rows": [[0, 0, 0, 0, 0, 1234.0, 9383.6], …],
+  "rows_cruces": [[4, "jur_fun", 0, 0, null, 265093707021.0, 265093707021.0], …]
 }
 ```
 
@@ -82,10 +99,18 @@ cruces y el cruce Comuna × Jurisdicción. El build
 verifica que esos agregados reconcilien con las sumas calculadas
 directamente sobre las filas del CSV (tolerancia 0,01 pesos).
 
+Los años de formato cruces (hoy, sólo 2027) no están en `rows`, sino en
+`rows_cruces`: una fila por celda de cada cruce, con `null` en la dimensión
+que no participa y sin ubicación. **Nunca se suman filas de distintos
+cruces de un mismo año.** La página elige, para cada vista, un único cruce
+que contenga todas las dimensiones que agrupa o filtra
+(`Metrics.pickRows`); si ninguno alcanza, el año figura como no disponible
+en esa vista (nunca como cero). El build controla que los tres cruces tengan
+el mismo total y los mismos subtotales por dimensión.
+
 `default_base_year` y `default_compared_year` son sólo los años que la página
 propone al abrirse (Año A y Año B); el usuario puede elegir cualquier par.
-Siguen la especificación (2026 y 2027) cuando el Proyecto está cargado;
-mientras falta, son 2025 y 2026.
+Siguen la especificación: 2026 y 2027.
 
 ## Presentación
 

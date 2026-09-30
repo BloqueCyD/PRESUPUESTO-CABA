@@ -1,4 +1,5 @@
 fuentes/*.csv
+!fuentes/presupuesto_2027_tablero.csv
 __pycache__/
 *.pyc
 .DS_Store

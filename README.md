@@ -1,14 +1,15 @@
 # ¿A dónde va la plata de la Ciudad? · Presupuesto CABA
 
-Tablero estático para comparar el presupuesto **Vigente** de la Ciudad
-Autónoma de Buenos Aires entre años, en pesos corrientes y a precios
+Tablero estático para comparar el presupuesto de la Ciudad Autónoma de
+Buenos Aires entre años (**Vigente** 2023–2026 y **Proyecto** 2027), en pesos corrientes y a precios
 constantes de 2027: cuánto aumenta o cae, qué jurisdicciones, funciones e
 incisos explican el cambio, cómo cambia la composición del gasto y qué
 categorías aparecen o desaparecen.
 
 Construido según el documento *Especificaciones para rearmar el tablero de
-Presupuesto CABA* (v1.0, 30/9/2026), con una única fuente de datos:
-`presupuesto_caba_historico_real_2027_limpio.csv`.
+Presupuesto CABA* (v1.0, 30/9/2026), con dos fuentes de datos:
+`presupuesto_caba_historico_real_2027_limpio.csv` (Vigente 2023–2026) y
+`presupuesto_2027_tablero.csv` (Proyecto de Ley 2027, crédito inicial).
 
 ## Cómo se leen los números
 
@@ -22,9 +23,9 @@ Presupuesto CABA* (v1.0, 30/9/2026), con una única fuente de datos:
   azulado, B ocre) que se repite en tarjetas, gráficos, tablas y encabezados,
   y cada monto lleva la etiqueta de su año, su tipo (Vigente o Proyecto) y su
   corte (T4 o T2).
-- El Proyecto 2027 todavía no está cargado: hoy se puede comparar entre 2023
-  y 2026. Cuando se cargue, 2027 aparece como una opción más y pasa a ser el
-  Año B por defecto (con 2026 como Año A), como pide la especificación.
+- El Proyecto 2027 está cargado: la página abre comparando Vigente 2026 (A)
+  con Proyecto 2027 (B), como pide la especificación. Ver *Cómo funciona el
+  Proyecto 2027* más abajo.
 
 ## Qué incluye
 
@@ -70,42 +71,68 @@ porcentual.
 ├── app.js              → interfaz (render, filtros, URL, exportación)
 ├── metrics.js          → funciones puras de comparación (compartidas con las pruebas)
 ├── chart.umd.min.js    → Chart.js 4.4.4 vendorizado (sin CDN)
-├── presupuesto.json    → datos generados por build_data.py (unos 240 KB)
+├── presupuesto.json    → datos generados por build_data.py (unos 270 KB)
 ├── build_data.py       → fuentes CSV → presupuesto.json, con validaciones
 ├── test_build.py       → pruebas del build (Python)
 ├── test_metrics.js     → pruebas de las métricas (Node)
 ├── DICCIONARIO.md      → contrato de datos y metodología
-└── fuentes/            → CSV de origen (no se versiona, ver abajo)
+└── fuentes/            → CSV de origen (el histórico no se versiona; el de 2027 sí)
 ```
 
 ## Cómo actualizar los datos
 
 1. Copiá `presupuesto_caba_historico_real_2027_limpio.csv` en `fuentes/`.
    Pesa unos 130 MB: GitHub rechaza archivos de más de 100 MB, por eso
-   `fuentes/*.csv` está en `.gitignore`. El sitio publicado sólo necesita
-   `presupuesto.json` (unos 240 KB).
-2. Corré `python3 build_data.py` (Python 3.9 o superior, sin dependencias).
-   Imprime el resumen de validación y termina con error si algo falla.
+   `fuentes/*.csv` está en `.gitignore` (salvo `presupuesto_2027_tablero.csv`,
+   que pesa unos 100 KB y sí se versiona). El sitio publicado sólo necesita
+   `presupuesto.json`.
+2. Corré `python3 build_data.py --requerir-2027` (Python 3.9 o superior, sin
+   dependencias). Imprime el resumen de validación y termina con error si algo
+   falla.
+   - Si no tenés a mano el CSV histórico y sólo cambió el Proyecto 2027, corré
+     `python3 build_data.py --base-json presupuesto.json --requerir-2027`:
+     toma 2023–2026 del `presupuesto.json` ya publicado y rearma 2027. Da el
+     mismo resultado que el build completo.
 3. Corré las pruebas: `python3 test_build.py` y `node test_metrics.js`.
 4. Commiteá el `presupuesto.json` resultante.
 
-## Cómo cargar el Proyecto 2027
+## Cómo funciona el Proyecto 2027
 
-En `build_data.py`, reemplazá `2027: None` en `SOURCES` por la
-configuración del archivo, con el nombre real del archivo y de la columna de
-monto del Proyecto:
+La fuente del Proyecto (`fuentes/presupuesto_2027_tablero.csv`, columna
+`Credito_Inicial`) no viene al mismo nivel de detalle que 2023–2026. Trae
+tres cruces de dos dimensiones, tal como las planillas del Proyecto de Ley:
 
-```python
-2027: {"archivo": "<archivo_proyecto_2027>.csv", "tipo": "proyecto",
-       "columna_monto": "<columna_del_proyecto>", "columna_anio": "anio"},
-```
+| Cruce | Planilla | Filas |
+|---|---|---|
+| Función × Inciso | Planilla 3 | 160 |
+| Jurisdicción × Inciso | Planilla 4 | 176 |
+| Jurisdicción × Función | Planilla 8 | 440 |
 
-El archivo tiene que traer las mismas columnas de dimensión que la fuente
-histórica (`Jur`, `Desc_Jur`, `Fin`, `Desc_Fin`, `Fun`, `Desc_Fun`,
-`Inciso`, `Desc_Inc`) y una columna de año. Si el formato es distinto, hay
-que ajustar el mapeo antes de construir. Después corré
-`python3 build_data.py --requerir-2027`: con esa opción, el build falla si
-falta la fuente del Proyecto, como exige la especificación.
+y **no tiene ubicación geográfica**. Por eso 2027 no se mete en el grano
+completo (sería inventar la distribución): se publica aparte, en
+`rows_cruces`, y cada vista usa el cruce que contiene las dimensiones que
+necesita (las que agrupa más las de los filtros activos):
+
+- Totales, rankings, composición y tabla por jurisdicción, función o inciso;
+  los tres cruces; y la evolución 2023–2027: **disponibles**.
+- Cualquier filtro o agrupación de a dos dimensiones (por ejemplo, filtrar
+  una jurisdicción y ver sus incisos): **disponible**.
+- Todo lo que usa comuna o ubicación, o combina jurisdicción, función e
+  inciso a la vez (por ejemplo, filtrar jurisdicción y función y abrir por
+  inciso): **no disponible para 2027**. La tarjeta lo explica y ofrece un
+  botón para quitar el filtro que lo impide o pasar a comparar dos años con
+  comunas. En Evolución, esos casos omiten la columna 2027 en vez de
+  mostrarla en cero.
+
+El build verifica que los tres cruces sumen el mismo total
+($ 24.094.340.599.263) y que los subtotales por jurisdicción, función e
+inciso coincidan entre los dos cruces que comparte cada dimensión, así que
+el resultado no depende de qué cruce use cada vista. Los códigos
+(`Jur`, `Fin`.`Fun`, `Inciso`) son los mismos que en el histórico.
+
+Si en el futuro llega una versión con el detalle completo (con `Geo`),
+alcanza con cambiar `SOURCES[2027]` en `build_data.py` a formato `grano`
+(como los años Vigente) y 2027 pasa a funcionar en todas las vistas.
 
 ## Publicación en GitHub Pages
 
@@ -119,6 +146,9 @@ Para verlo en local: `python3 -m http.server 8000` y abrí
 
 ## Limitaciones conocidas
 
+- **2027 es Proyecto (crédito inicial)** y llega en tres cruces sin comunas
+  (ver arriba). Comparar un Proyecto contra un Vigente mide la diferencia
+  entre lo que se propone gastar y lo que está autorizado, no ejecución.
 - **2026 es Vigente al T2** (corte del segundo trimestre), mientras que
   2023–2025 son T4. La página muestra el corte en los selectores de año, en
   las tarjetas y en los encabezados de Evolución.

@@ -6,15 +6,22 @@
 (function (root) {
   'use strict';
 
-  /** Decodifica presupuesto.json (schema_version 2) a objetos legibles. */
+  /**
+   * Decodifica presupuesto.json (schema_version 4) a objetos legibles.
+   * Hay dos tipos de filas:
+   *  - grano completo (año × jurisdicción × función × inciso × ubicación), layer = 'grano';
+   *  - cruces de dos dimensiones (Proyecto 2027: jur_fun, jur_inc, fun_inc), con la
+   *    dimensión que no participa en null y sin ubicación.
+   * Nunca se suman filas de distintas capas de un mismo año: pickRows elige una.
+   */
   function decode(json) {
-    if (!json || !json.meta || json.meta.schema_version !== 3) {
-      throw new Error('presupuesto.json no tiene schema_version 3.');
+    if (!json || !json.meta || json.meta.schema_version !== 4) {
+      throw new Error('presupuesto.json no tiene schema_version 4.');
     }
     const d = json.dimensions;
     const years = d.periodos;
     const rows = json.rows.map(r => ({
-      year: years[r[0]],
+      year: years[r[0]], layer: 'grano',
       jur: d.jurisdicciones[r[1]].id,
       fun: d.funciones[r[2]].id,
       inc: d.incisos[r[3]].id,
@@ -22,6 +29,17 @@
       nominal: r[5],
       real: r[6],
     }));
+    for (const r of json.rows_cruces || []) {
+      rows.push({
+        year: years[r[0]], layer: r[1],
+        jur: r[2] == null ? null : d.jurisdicciones[r[2]].id,
+        fun: r[3] == null ? null : d.funciones[r[3]].id,
+        inc: r[4] == null ? null : d.incisos[r[4]].id,
+        geo: null,
+        nominal: r[5],
+        real: r[6],
+      });
+    }
     const label = {
       jur: Object.fromEntries(d.jurisdicciones.map(x => [x.id, x.label])),
       fun: Object.fromEntries(d.funciones.map(x => [x.id, x.label])),
@@ -29,7 +47,33 @@
       geo: Object.fromEntries(d.ubicaciones.map(x => [x.id, x.label])),
     };
     const typeOf = Object.fromEntries(json.meta.periods.map(p => [p.periodo, p.tipo_presupuesto]));
-    return { meta: json.meta, dims: d, years, rows, label, typeOf };
+    // Capas de cada año: ['grano'] o la lista de cruces, con sus dimensiones.
+    const crossDims = json.meta.cross_dims || {};
+    const layersOf = Object.fromEntries(json.meta.periods.map(p => [p.periodo,
+      p.grano === 'cruces' ? (p.cruces || []).map(c => ({ id: c, dims: crossDims[c] || [] })) : [{ id: 'grano', dims: ['jur', 'fun', 'inc', 'geo'] }]]));
+    return { meta: json.meta, dims: d, years, rows, label, typeOf, layersOf };
+  }
+
+  /** Capa de un año que contiene todas las dimensiones pedidas, o null si ninguna alcanza. */
+  function layerFor(D, year, need) {
+    const n = [...new Set(need || [])];
+    const ok = (D.layersOf[year] || []).find(l => n.every(x => l.dims.includes(x)));
+    return ok ? ok.id : null;
+  }
+
+  /** Años en los que ninguna capa tiene las dimensiones pedidas. */
+  function missingYears(D, need, years) {
+    return (years || D.years).filter(y => layerFor(D, y, need) == null);
+  }
+
+  /**
+   * Filas utilizables para una vista que agrupa o filtra por las dimensiones
+   * `need`: de cada año, sólo la capa elegida por layerFor. Los años sin capa
+   * quedan afuera (y figuran en `missing`), para no confundirlos con ceros.
+   */
+  function pickRows(D, need) {
+    const pick = Object.fromEntries(D.years.map(y => [y, layerFor(D, y, need)]));
+    return { rows: D.rows.filter(r => r.layer === pick[r.year]), missing: D.years.filter(y => pick[y] == null), layers: pick };
   }
 
   /** Mismo recorte para todos los años: filtros {jur, fun, inc, geo} ('' = todas). */
@@ -152,6 +196,6 @@
     return items;
   }
 
-  const M = { decode, evolution, applyFilters, keyOf, totalsOf, estadoOf, pctChange, compare, rankings };
+  const M = { decode, layerFor, missingYears, pickRows, evolution, applyFilters, keyOf, totalsOf, estadoOf, pctChange, compare, rankings };
   if (typeof module !== 'undefined' && module.exports) module.exports = M; else root.Metrics = M;
 })(typeof self !== 'undefined' ? self : this);

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>¿A dónde va la plata de la Ciudad? · Presupuesto CABA</title>
-<meta name="description" content="¿A dónde va la plata de la Ciudad? Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años: montos nominales y variaciones reales o nominales por jurisdicción, función, inciso y comuna.">
+<meta name="description" content="¿A dónde va la plata de la Ciudad? Comparación del presupuesto de la Ciudad de Buenos Aires entre años (Vigente 2023–2026 y Proyecto 2027): montos nominales y variaciones reales o nominales por jurisdicción, función, inciso y comuna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -22,13 +22,17 @@
     </div>
     <div class="header-meta">
       <span class="badge" id="mode-badge">Variaciones reales</span>
-      <span class="source-note">2023–2026: presupuesto Vigente. 2027: Proyecto de Presupuesto.</span>
+      <span class="source-note">2023–2026: presupuesto Vigente. 2027: Proyecto de Presupuesto (crédito inicial).</span>
     </div>
   </div>
 </header>
 
 <div class="pending" id="pending-note" hidden>
   <div class="wrap"><p><strong>El Proyecto de Presupuesto 2027 todavía no está cargado.</strong> Por ahora podés comparar cualquier par de años entre <span class="js-first-year">2023</span> y <span class="js-last-year">2026</span>.</p></div>
+</div>
+
+<div class="pending info" id="proyecto-note" hidden>
+  <div class="wrap"><p id="proyecto-note-text"></p></div>
 </div>
 
 <section class="controls" aria-label="Controles">
@@ -284,7 +288,7 @@
 </div>
 
 <footer class="site-footer">
-  <div class="wrap"><p>Fuente: presupuesto Vigente de la Ciudad de Buenos Aires. Variaciones reales calculadas a precios de 2027 con el IPC promedio de cada año.</p></div>
+  <div class="wrap"><p>Fuente: Gobierno de la Ciudad de Buenos Aires. 2023–2026: presupuesto Vigente. 2027: Proyecto de Ley de Presupuesto, crédito inicial (Planillas 3, 4 y 8). Variaciones reales calculadas a precios de 2027 con el IPC promedio de cada año.</p></div>
 </footer>
 
 <script src="chart.umd.min.js"></script>

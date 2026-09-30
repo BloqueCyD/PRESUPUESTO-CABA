@@ -1,5 +1,9 @@
 /* app.js — Presupuesto CABA: comparación entre años, evolución y comunas.
- * Consume presupuesto.json (schema_version 3) generado por build_data.py.
+ * Consume presupuesto.json (schema_version 4) generado por build_data.py.
+ * 2023–2026 llegan en un grano completo; el Proyecto 2027, en tres cruces de dos
+ * dimensiones y sin ubicación. Cada vista pide las dimensiones que necesita y
+ * usa, año por año, la capa que las contiene (M.pickRows). Si un año no tiene
+ * ninguna, la vista lo avisa en vez de mostrarlo como cero.
  * Regla de presentación: los MONTOS se muestran siempre nominales (pesos
  * corrientes de cada año). Sólo las VARIACIONES pueden verse reales (a precios
  * de 2027) o nominales. Los montos reales llegan precalculados del build.
@@ -67,6 +71,10 @@
   const typeName = y => D.typeOf[y] === 'proyecto' ? 'Proyecto' : 'Vigente';
   const yearLabel = y => typeName(y) + ' ' + y;
   const versionOf = y => (D.meta.periods.find(p => p.periodo === y) || {}).version_fuente;
+  // Corte o etapa de cada año: "T4"/"T2" para el Vigente, "crédito inicial" para el Proyecto.
+  const cutOf = y => D.typeOf[y] === 'proyecto' ? 'crédito inicial' : (versionOf(y) || '');
+  const cutPhrase = y => D.typeOf[y] === 'proyecto' ? 'crédito inicial' : 'corte ' + (versionOf(y) || 's/d');
+  const shortTag = y => D.typeOf[y] === 'proyecto' ? 'Proyecto' : ('Vigente' + (versionOf(y) ? ' ' + versionOf(y) : ''));
   const PB = () => D.meta.price_base;
   function chip(y) {
     const cls = y === state.a ? 'a' : y === state.b ? 'b' : 'plain';
@@ -88,18 +96,58 @@
   const isComuna = key => /^comuna\b/i.test(labelOf('geo', key));
 
   /* ---------------- datos ---------------- */
+  // Dimensiones que necesita una vista: las que agrupa más las de los filtros activos.
+  const FDIMS = ['jur', 'fun', 'inc', 'geo'];
+  const filterDims = () => FDIMS.filter(d => state.filters[d]);
+  const needOf = (dims = []) => [...new Set(dims.concat(filterDims()))];
   let cache = null;
-  function filtered() {
-    if (!cache) cache = { rows: M.applyFilters(D.rows, state.filters), cmp: {} };
-    return cache.rows;
+  /** Filas filtradas, tomando de cada año la capa que contiene las dimensiones de la vista. */
+  function filtered(dims = []) {
+    if (!cache) cache = { rows: {}, cmp: {} };
+    const k = needOf(dims).sort().join('_');
+    if (!cache.rows[k]) cache.rows[k] = M.applyFilters(M.pickRows(D, needOf(dims)).rows, state.filters);
+    return cache.rows[k];
   }
   function cmp(dims, rows) {
     if (rows) return M.compare(rows, state.a, state.b, dims);
-    filtered();
     const k = dims.join('_');
-    if (!cache.cmp[k]) cache.cmp[k] = M.compare(cache.rows, state.a, state.b, dims);
+    if (!cache || !cache.cmp[k]) { const r = filtered(dims); cache.cmp[k] = M.compare(r, state.a, state.b, dims); }
     return cache.cmp[k];
   }
+  /** Años (por defecto A y B) que no tienen datos con el detalle que pide la vista. */
+  const missing = (dims = [], years = [state.a, state.b]) => M.missingYears(D, needOf(dims), years);
+  const geoYears = () => D.years.filter(y => M.layerFor(D, y, ['geo']) != null);
+
+  /* ---- vistas no disponibles para un año (Proyecto 2027: sin comunas y en cruces de a dos) ---- */
+  function naText(dims, miss, opt = {}) {
+    const need = needOf(dims);
+    const ys = miss.map(chip).join(' y ');
+    const byFilter = need.filter(d => state.filters[d] && !dims.includes(d));
+    const names = list => list.map(d => DIM_NAME[d]).join(', ').replace(/, ([^,]*)$/, ' y $1');
+    let why, action = '';
+    if (need.includes('geo')) {
+      why = `Esa fuente no trae apertura por comuna o ubicación geográfica: se publica sólo por jurisdicción, función e inciso.`;
+      if (byFilter.includes('geo')) action = `<button type="button" class="btn small" data-na="clear" data-dims="geo">Quitar el filtro de Comuna o ubicación</button>`;
+      else if (!opt.noYears) {
+        const gy = geoYears();
+        if (gy.length >= 2) action = `<button type="button" class="btn small" data-na="years" data-a="${gy[gy.length - 2]}" data-b="${gy[gy.length - 1]}">Comparar ${esc(yearLabel(gy[gy.length - 2]))} → ${esc(yearLabel(gy[gy.length - 1]))}</button>`;
+      }
+    } else {
+      why = `Esa fuente se publica en tres cruces de dos dimensiones (Jurisdicción × Función, Jurisdicción × Inciso y Función × Inciso), y esta vista necesita ${names(need)} a la vez${byFilter.length ? ' por los filtros elegidos' : ''}.`;
+      if (byFilter.length) action = `<button type="button" class="btn small" data-na="clear" data-dims="${byFilter.join(',')}">Quitar el filtro de ${names(byFilter)}</button>`;
+    }
+    return `<strong>${opt.lead || 'No disponible para'} ${ys}.</strong> ${why}${action ? ` <span class="na-action">${action}</span>` : ''}`;
+  }
+  /** Marca una tarjeta como no disponible (oculta su contenido y muestra el motivo) o la restablece. */
+  function setNA(headingId, html) {
+    const card = $(headingId).closest('.card');
+    let note = card.querySelector(':scope > .na-note');
+    if (!note) { note = document.createElement('div'); note.className = 'na-note'; note.setAttribute('role', 'note'); card.querySelector(':scope > .card-head, :scope > h2').after(note); }
+    card.classList.toggle('is-na', !!html);
+    note.hidden = !html; note.innerHTML = html ? `<p>${html}</p>` : '';
+    return !!html;
+  }
+  function killChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
   function activeFilterText() {
     return ['jur', 'fun', 'inc', 'geo'].filter(d => state.filters[d])
       .map(d => `${DIM_NAME[d]} = ${labelOf(d, state.filters[d])}`).join('; ');
@@ -141,7 +189,7 @@
 
   /* ---------------- controles ---------------- */
   function buildControls() {
-    const opts = D.years.map(y => `<option value="${y}">${yearLabel(y)}${versionOf(y) ? ' (' + versionOf(y) + ')' : ''}</option>`).join('');
+    const opts = D.years.map(y => `<option value="${y}">${yearLabel(y)}${cutOf(y) ? ' (' + cutOf(y) + ')' : ''}</option>`).join('');
     $('year-a').innerHTML = opts; $('year-b').innerHTML = opts;
     const onYear = (which) => (e) => {
       const v = +e.target.value, other = which === 'a' ? 'b' : 'a';
@@ -184,6 +232,13 @@
     $('to-evo-geo').addEventListener('click', () => { state.tab = 'evolucion'; state.evoDim = 'geo'; state.evoSel = null; update(); window.scrollTo({ top: 0 }); });
     $('com-sel').addEventListener('change', e => { state.comSel = e.target.value; renderComunaDetail(); markComunaRow(); });
     bindTabs('com-det-tabs', 'dim', v => { state.comDetDim = v; });
+    // Botones de los avisos "no disponible".
+    $('app').addEventListener('click', e => {
+      const b = e.target.closest('button[data-na]'); if (!b) return;
+      if (b.dataset.na === 'clear') for (const d of b.dataset.dims.split(',')) state.filters[d] = '';
+      if (b.dataset.na === 'years') { state.a = +b.dataset.a; state.b = +b.dataset.b; }
+      state.crossSel = null; state.evoSel = null; update();
+    });
   }
 
   function bindTabs(id, attr, set) {
@@ -218,7 +273,7 @@
     // Opciones de filtro: claves con monto en algún año visible (A y B, o todos en Evolución).
     const ys = evo ? D.years : [state.a, state.b];
     const present = { jur: new Set(), fun: new Set(), inc: new Set(), geo: new Set() };
-    for (const r of D.rows) if (ys.includes(r.year) && r.nominal !== 0) for (const d in present) present[d].add(r[d]);
+    for (const r of D.rows) if (ys.includes(r.year) && r.nominal !== 0) for (const d in present) if (r[d] != null) present[d].add(r[d]);
     const opt = x => `<option value="${esc(x.id)}">${esc(x.label)}</option>`;
     const fill = (d, list, allLabel, sorter) => {
       const cur = state.filters[d];
@@ -246,6 +301,11 @@
     document.title = '¿A dónde va la plata de la Ciudad? · ' + $('page-context').textContent;
     $('mode-badge').textContent = state.mode === 'real' ? `Variaciones reales (precios de ${PB()})` : 'Variaciones nominales';
     $('pending-note').hidden = !!D.meta.proyecto_2027_disponible;
+    // Aviso sobre el detalle del Proyecto cuando está en juego (A, B o Evolución).
+    const partial = D.years.filter(y => M.layerFor(D, y, ['jur', 'fun', 'inc', 'geo']) == null);
+    const shown = state.tab === 'evolucion' ? partial : partial.filter(y => y === state.a || y === state.b);
+    $('proyecto-note').hidden = !shown.length;
+    if (shown.length) $('proyecto-note-text').innerHTML = `<strong>${shown.map(y => esc(yearLabel(y))).join(' y ')}:</strong> crédito inicial del Proyecto de Ley, publicado en tres cruces (Jurisdicción × Función, Jurisdicción × Inciso y Función × Inciso) y sin apertura por comuna. Todo lo que se arma con una o dos de esas dimensiones está disponible; las vistas por comuna, o las que combinan jurisdicción, función e inciso a la vez, avisan cuando no se pueden calcular.`;
     document.querySelectorAll('.js-ya').forEach(e => { e.innerHTML = chip(state.a); });
     document.querySelectorAll('.js-yb').forEach(e => { e.innerHTML = chip(state.b); });
     document.querySelectorAll('.js-range').forEach(e => { e.textContent = `${D.years[0]}–${D.years[D.years.length - 1]}`; });
@@ -257,10 +317,19 @@
 
   /* =============== COMPARACIÓN =============== */
   function renderKPIs() {
-    const { totals } = cmp(['jur']);
     const a = state.a, b = state.b, pb = PB();
+    const miss = missing([]);
+    if (miss.length) {
+      const card = (y, cls) => `<div class="kpi ${cls}"><p class="label">${chip(y)} <span class="ver">${esc(cutPhrase(y))}</span></p>
+        <p class="value">${miss.includes(y) ? '<span class="muted">No disponible</span>' : fmtAbbrev(M.totalsOf(filtered([]), y).nominal)}</p><p class="full">${miss.includes(y) ? 'sin el detalle que pide el filtro' : fmtFull(M.totalsOf(filtered([]), y).nominal) + ' nominales'}</p></div>`;
+      const v = t => `<div class="kpi dim"><p class="label">${t}</p><p class="value"><span class="muted">No aplica</span></p><p class="sub">falta uno de los dos años</p></div>`;
+      $('kpi-grid').innerHTML = card(a, 'a') + card(b, 'b') + v('Variación nominal') + v(`Variación real <span class="muted">(precios de ${pb})</span>`);
+      $('synthesis').innerHTML = `<span class="na-inline">${naText([], miss)}</span>`;
+      return;
+    }
+    const { totals } = cmp([]);
     const empty = totals.base.nominal === 0 && totals.comp.nominal === 0;
-    const amountCard = (y, cls, v) => `<div class="kpi ${cls}"><p class="label">${chip(y)} <span class="ver">corte ${esc(versionOf(y) || 's/d')}</span></p>
+    const amountCard = (y, cls, v) => `<div class="kpi ${cls}"><p class="label">${chip(y)} <span class="ver">${esc(cutPhrase(y))}</span></p>
       <p class="value">${fmtAbbrev(v)}</p><p class="full">${fmtFull(v)} nominales</p></div>`;
     const varCard = (m, title) => {
       const t = totals[m];
@@ -281,6 +350,8 @@
 
   function renderRankings() {
     const dim = state.rankDim, m = state.mode, ord = state.rankOrder;
+    const miss = missing([dim]);
+    if (setNA('h-rank', miss.length ? naText([dim], miss) : '')) return;
     const { items } = cmp([dim]);
     const byChange = ord === 'abs';
     const lab = i => labelOf(dim, i.parts[0]);
@@ -326,6 +397,8 @@
 
   function renderComposition() {
     const dim = state.compDim;
+    const miss = missing([dim]);
+    if (setNA('h-comp', miss.length ? naText([dim], miss) : '')) { killChart('comp-chart'); return; }
     const { items, totals } = cmp([dim]);
     const list = items.filter(i => i.estado !== 'sin_movimiento').sort((x, y) => y.comp.nominal - x.comp.nominal || y.base.nominal - x.base.nominal);
     const shareMax = i => Math.max(i.nominal.partBase || 0, i.nominal.partComp || 0);
@@ -370,6 +443,8 @@
 
   function renderCross() {
     const [ra, cb] = CROSSES[state.cross], m = state.mode;
+    const miss = missing([ra, cb]);
+    if (setNA('h-cross', miss.length ? naText([ra, cb], miss) : '')) return;
     const cross = cmp([ra, cb]), rowsT = cmp([ra]).items, colsT = cmp([cb]).items, totalAbs = cmp([ra]).totals[m].abs;
     $('cross-unit').innerHTML = `Cada celda muestra la variación ${modeWord()} de ${chip(state.a)} a ${chip(state.b)}${m === 'real' ? `, en pesos a precios de ${PB()}` : ', en pesos corrientes'}. Filas: ${DIM_NAME[ra]}. Columnas: ${DIM_NAME[cb]}.`;
     const cellMap = new Map(cross.items.map(i => [i.key, i]));
@@ -460,6 +535,9 @@
     return { dims, rows, shown: state.tableTop === 'all' ? rows : rows.slice(0, +state.tableTop), totals };
   }
   function renderTable() {
+    const miss = missing(tableDims());
+    $('export-csv').disabled = !!miss.length;
+    if (setNA('h-table', miss.length ? naText(tableDims(), miss) : '')) return;
     const { dims, rows, shown, totals } = tableRows();
     const m = state.mode;
     $('table-unit').innerHTML = `Montos nominales completos de cada año. ${esc(varUnit())}. ${shown.length} de ${rows.length} filas.`;
@@ -488,6 +566,7 @@
   }
 
   function exportCSV() {
+    if (missing(tableDims()).length) return;
     const { dims, shown, rows, totals } = tableRows();
     const a = state.a, b = state.b, pb = PB();
     const q = v => { const s = v == null ? '' : String(v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -539,9 +618,12 @@
 
   /* =============== EVOLUCIÓN =============== */
   function renderEvolucion() {
-    const years = D.years, m = state.mode, dim = state.evoDim, rows = filtered();
-    const total = M.evolution(rows, years, [])[0];
-    const items = dim === 'total' ? [] : M.evolution(rows, years, [dim]);
+    const m = state.mode, dim = state.evoDim, gdims = dim === 'total' ? [] : [dim];
+    // Años sin el detalle que pide la vista (p. ej. 2027 por comuna): se omiten, no se muestran como cero.
+    const skipped = missing(gdims, D.years);
+    const years = D.years.filter(y => !skipped.includes(y));
+    const total = M.evolution(filtered([]), years, [])[0];
+    const items = dim === 'total' ? [] : M.evolution(filtered(gdims), years, [dim]);
     const last = years[years.length - 1];
     items.sort((x, y) => y.byYear[last].nominal - x.byYear[last].nominal || y.byYear[x.firstYear].nominal - x.byYear[x.firstYear].nominal);
     if (dim !== 'total' && (!state.evoSel || ![...state.evoSel].every(k => items.some(i => i.key === k)))) {
@@ -549,7 +631,8 @@
     }
     const lbl = i => i.key === 'total' ? 'Total' : labelOf(dim, i.parts[0]);
     if (state.evoSort !== 'desc') sortList(items, state.evoSort, i => i.byYear[last].nominal, lbl);
-    $('evo-intro').textContent = `Montos nominales de cada año (${years.map(y => `${y}: ${typeName(y)} ${versionOf(y) || ''}`.trim()).join(', ')}). ${varUnit()}. La variación acumulada se mide desde el primer año con asignación de cada categoría.${dim === 'total' ? '' : ` Tabla ordenada por ${SORT_TEXT[state.evoSort]}${state.evoSort === 'alfa' ? '' : ` (monto de ${last})`}.`}`;
+    $('evo-intro').innerHTML = (skipped.length ? `<span class="na-inline">${naText(gdims, skipped, { lead: 'Se omite', noYears: true })}</span>` : '')
+      + esc(`Montos nominales de cada año (${years.map(y => `${y}: ${D.typeOf[y] === 'proyecto' ? 'Proyecto, crédito inicial' : shortTag(y)}`).join('; ')}). ${varUnit()}.`) + esc(` La variación acumulada se mide desde el primer año con asignación de cada categoría.${dim === 'total' ? '' : ` Tabla ordenada por ${SORT_TEXT[state.evoSort]}${state.evoSort === 'alfa' ? '' : ` (monto de ${last})`}.`}`);
     $('evo-var-title').innerHTML = `Variación ${modeWord()} acumulada <span class="muted">(desde el primer año con asignación${m === 'real' ? `, precios de ${PB()}` : ''})</span>`;
 
     if (!total) {
@@ -559,7 +642,7 @@
     }
     const series = dim === 'total' ? [total] : items.filter(i => state.evoSel.has(i.key));
     const colorOf = new Map(series.map((s, k) => [s.key, dim === 'total' ? COLOR_B : PALETTE[k % PALETTE.length]]));
-    const xLabels = years.map(y => [String(y), typeName(y) + (versionOf(y) ? ' ' + versionOf(y) : '')]);
+    const xLabels = years.map(y => [String(y), shortTag(y)]);
 
     draw('evo-nominal', {
       type: 'bar',
@@ -588,7 +671,7 @@
     const pairs = years.slice(1).map((y, i) => [years[i], y]);
     $('evo-pick-note').textContent = dim === 'total' ? '' : `Marcá hasta ${EVO_MAX} filas para verlas en los gráficos (${state.evoSel.size} marcadas).`;
     const head = `<thead><tr>${dim === 'total' ? '' : '<th class="sel"><span class="sr-only">Graficar</span></th>'}<th>${dim === 'total' ? '' : DIM_NAME[dim]}</th>
-      ${years.map(y => `<th class="num">${y}<br><span class="ver">${typeName(y)}${versionOf(y) ? ' ' + versionOf(y) : ''}, nominal</span></th>`).join('')}
+      ${years.map(y => `<th class="num">${y}<br><span class="ver">${esc(shortTag(y))}, nominal</span></th>`).join('')}
       ${pairs.map(([p, n]) => `<th class="num">${p}→${n}<br><span class="ver">var. ${modeWord()}</span></th>`).join('')}
       <th class="num">Acumulada<br><span class="ver">var. ${modeWord()}</span></th></tr></thead>`;
     const row = (it, isTotal) => {
@@ -611,6 +694,11 @@
   /* =============== COMUNAS =============== */
   function renderComunas() {
     const m = state.mode, a = state.a, b = state.b;
+    const miss = missing(['geo']);
+    const na = miss.length ? naText(['geo'], miss) : '';
+    const short = na ? `<strong>No disponible para ${miss.map(chip).join(' y ')}.</strong> Mirá el aviso de arriba.` : '';
+    setNA('h-com', na); setNA('h-com-det', short); setNA('h-com-other', short);
+    if (na) { killChart('com-amounts'); killChart('com-var'); renderComunaNominal(); return; }
     const { items, totals } = cmp(['geo']);
     const live = items.filter(i => i.estado !== 'sin_movimiento');
     const gl = i => labelOf('geo', i.parts[0]);
@@ -712,18 +800,24 @@
   };
 
   function renderComunaNominal() {
-    const years = D.years;
+    // Sólo los años que tienen apertura por comuna (el Proyecto 2027 no la trae).
+    const years = D.years.filter(v => !missing(['geo'], [v]).length);
+    const skipped = D.years.filter(v => !years.includes(v));
+    if (!years.length) {
+      killChart('com-nominal'); $('com-year').innerHTML = '';
+      $('com-nom-unit').innerHTML = naText(['geo'], skipped); $('com-nom-note').innerHTML = ''; return;
+    }
     if (state.comYear == null || !years.includes(state.comYear)) state.comYear = null;
-    const y = state.comYear == null ? state.b : state.comYear;
-    $('com-year').innerHTML = years.map(v => `<option value="${v}">${esc(yearLabel(v))}${versionOf(v) ? ' (' + versionOf(v) + ')' : ''}</option>`).join('');
+    const y = state.comYear != null ? state.comYear : years.includes(state.b) ? state.b : years.includes(state.a) ? state.a : years[years.length - 1];
+    $('com-year').innerHTML = years.map(v => `<option value="${v}">${esc(yearLabel(v))}${cutOf(v) ? ' (' + cutOf(v) + ')' : ''}</option>`).join('');
     $('com-year').value = y;
-    const evo = M.evolution(filtered(), years, ['geo']);
+    const evo = M.evolution(filtered(['geo']), years, ['geo']);
     const gl = i => labelOf('geo', i.parts[0]);
     const list = sortList(evo.filter(i => isComuna(i.parts[0]) && i.byYear[y].nominal !== 0), state.comNomSort, i => i.byYear[y].nominal, gl);
     const amt = i => i.byYear[y].nominal;
     const total = list.reduce((s, i) => s + amt(i), 0);
     const avg = list.length ? total / list.length : null;
-    $('com-nom-unit').innerHTML = `Monto asignado a cada comuna en ${chip(y)}, en pesos corrientes de ese año (nominal), sin comparar contra otro año. Permite ver qué comunas reciben más y cuáles menos. Al lado de cada barra: monto y porcentaje sobre el total asignado a comunas. La línea punteada marca el promedio por comuna. Orden: ${SORT_TEXT[state.comNomSort]}.`;
+    $('com-nom-unit').innerHTML = `Monto asignado a cada comuna en ${chip(y)}, en pesos corrientes de ese año (nominal), sin comparar contra otro año. Permite ver qué comunas reciben más y cuáles menos. Al lado de cada barra: monto y porcentaje sobre el total asignado a comunas. La línea punteada marca el promedio por comuna. Orden: ${SORT_TEXT[state.comNomSort]}.${skipped.length ? ` ${skipped.map(v => esc(yearLabel(v))).join(' y ')} no figura${skipped.length > 1 ? 'n' : ''} en el selector porque no trae${skipped.length > 1 ? 'n' : ''} apertura por comuna.` : ''}`;
     if (!list.length) {
       if (charts['com-nominal']) { charts['com-nominal'].destroy(); delete charts['com-nominal']; }
       $('com-nom-note').innerHTML = 'No hay montos asignados a comunas para este año y filtro.';
@@ -763,7 +857,7 @@
   function renderComunaDetail() {
     const key = state.comSel, dim = state.comDetDim, m = state.mode;
     if (!key) { $('com-det-table').innerHTML = '<tbody><tr><td class="empty">Sin comunas para este filtro.</td></tr></tbody>'; $('com-det-unit').textContent = ''; return; }
-    const rows = filtered().filter(r => r.geo === key);
+    const rows = filtered(['geo']).filter(r => r.geo === key);
     const { items, totals } = cmp([dim], rows);
     const ord = state.comDetSort;
     const list = items.filter(i => i.estado !== 'sin_movimiento');
