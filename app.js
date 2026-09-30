@@ -19,16 +19,28 @@
   const state = {
     tab: 'comparacion', a: null, b: null, mode: 'real',
     filters: { jur: '', fun: '', inc: '', geo: '' },
-    rankDim: 'jur', rankOrder: 'abs', compDim: 'jur',
+    rankDim: 'jur', rankOrder: 'abs', compDim: 'jur', compSort: 'desc',
     cross: 'jur_inc', crossSearch: '', crossTop: '15', crossSort: 'abs', crossSel: null,
     tableDim: 'jur', tableSearch: '', tableTop: 'all', tableZero: false, tableSort: { col: 'abs', dir: 'desc' },
-    evoDim: 'total', evoSel: null,
-    comSel: null, comDetDim: 'jur',
+    evoDim: 'total', evoSel: null, evoSort: 'desc',
+    comSel: null, comDetDim: 'jur', comDetSort: 'abs', comSort: 'alfa', comNomSort: 'desc', comYear: null,
   };
 
   const $ = id => document.getElementById(id);
   const esc = s => (s == null ? '' : String(s)).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fold = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  /* ---------------- orden ----------------
+   * how: 'desc' (asignación mayor a menor), 'asc' (menor a mayor) o 'alfa' (alfabético,
+   * con números en orden natural: Comuna 2 antes que Comuna 10). */
+  const byText = (x, y) => x.localeCompare(y, 'es', { numeric: true, sensitivity: 'base' });
+  function sortList(list, how, amount, label) {
+    const al = (x, y) => byText(label(x), label(y));
+    if (how === 'alfa') return list.sort(al);
+    if (how === 'asc') return list.sort((x, y) => amount(x) - amount(y) || al(x, y));
+    return list.sort((x, y) => amount(y) - amount(x) || al(x, y));
+  }
+  const SORT_TEXT = { desc: 'asignación, de mayor a menor', asc: 'asignación, de menor a mayor', alfa: 'orden alfabético' };
 
   /* ---------------- formato ---------------- */
   const nf = (n, d) => n.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -74,7 +86,6 @@
   }
   const estadoShort = e => ({ nueva: `Nueva en ${state.b}`, eliminada: `Sin asignación en ${state.b}`, continua: 'Continúa', sin_movimiento: 'Sin movimiento' }[e]);
   const isComuna = key => /^comuna\b/i.test(labelOf('geo', key));
-  const geoNum = key => { const m = /(\d+)/.exec(labelOf('geo', key)); return m ? +m[1] : 999; };
 
   /* ---------------- datos ---------------- */
   let cache = null;
@@ -152,6 +163,12 @@
     bindTabs('main-tabs', 'tab', v => { state.tab = v; });
     $('rank-dim').addEventListener('change', e => { state.rankDim = e.target.value; update(); });
     $('rank-order').addEventListener('change', e => { state.rankOrder = e.target.value; update(); });
+    $('comp-sort').addEventListener('change', e => { state.compSort = e.target.value; renderComposition(); });
+    $('evo-sort').addEventListener('change', e => { state.evoSort = e.target.value; renderEvolucion(); });
+    $('com-sort').addEventListener('change', e => { state.comSort = e.target.value; renderComunas(); });
+    $('com-nom-sort').addEventListener('change', e => { state.comNomSort = e.target.value; renderComunaNominal(); });
+    $('com-year').addEventListener('change', e => { state.comYear = +e.target.value; renderComunaNominal(); });
+    $('com-det-sort').addEventListener('change', e => { state.comDetSort = e.target.value; renderComunaDetail(); });
     bindTabs('comp-tabs', 'dim', v => { state.compDim = v; });
     bindTabs('cross-tabs', 'cross', v => { state.cross = v; state.crossSel = null; });
     $('cross-search').addEventListener('input', e => { state.crossSearch = e.target.value; renderCross(); });
@@ -194,6 +211,9 @@
     setSel('main-tabs', 'tab', state.tab); setSel('comp-tabs', 'dim', state.compDim); setSel('cross-tabs', 'cross', state.cross); setSel('com-det-tabs', 'dim', state.comDetDim);
     for (const t of ['comparacion', 'evolucion', 'comunas']) $('panel-' + t).hidden = state.tab !== t;
     $('rank-dim').value = state.rankDim; $('rank-order').value = state.rankOrder; $('evo-dim').value = state.evoDim;
+    $('comp-sort').value = state.compSort; $('evo-sort').value = state.evoSort; $('com-sort').value = state.comSort;
+    $('com-nom-sort').value = state.comNomSort; $('com-det-sort').value = state.comDetSort;
+    $('evo-sort-wrap').hidden = state.evoDim === 'total';
 
     // Opciones de filtro: claves con monto en algún año visible (A y B, o todos en Evolución).
     const ys = evo ? D.years : [state.a, state.b];
@@ -222,8 +242,8 @@
     const t = state.tab === 'evolucion'
       ? `Evolución ${D.years[0]}–${D.years[D.years.length - 1]}`
       : `${yearLabel(state.b)} vs. ${yearLabel(state.a)}`;
-    $('page-title').textContent = state.tab === 'comunas' ? 'Comunas: ' + t : t;
-    document.title = $('page-title').textContent + ' · Presupuesto CABA';
+    $('page-context').textContent = state.tab === 'comunas' ? 'Comunas: ' + t : t;
+    document.title = '¿A dónde va la plata de la Ciudad? · ' + $('page-context').textContent;
     $('mode-badge').textContent = state.mode === 'real' ? `Variaciones reales (precios de ${PB()})` : 'Variaciones nominales';
     $('pending-note').hidden = !!D.meta.proyecto_2027_disponible;
     document.querySelectorAll('.js-ya').forEach(e => { e.innerHTML = chip(state.a); });
@@ -262,13 +282,28 @@
   function renderRankings() {
     const dim = state.rankDim, m = state.mode, ord = state.rankOrder;
     const { items } = cmp([dim]);
-    const R = M.rankings(items, m, ord, 10);
-    $('rank-unit').textContent = `Montos nominales de cada año. ${varUnit()}. Ordenado por cambio ${ord === 'pct' ? 'porcentual' : 'en pesos'}.`;
-    $('pct-warning').hidden = ord !== 'pct';
-    const val = i => ord === 'pct' ? i[m].pct : i[m].abs;
+    const byChange = ord === 'abs';
+    const lab = i => labelOf(dim, i.parts[0]);
+    let R;
+    if (byChange) R = M.rankings(items, m, 'abs', 10);
+    else {
+      const cont = items.filter(i => i.estado === 'continua');
+      const up = sortList(cont.filter(i => i[m].abs > 0), ord, i => i.comp.nominal, lab);
+      const down = sortList(cont.filter(i => i[m].abs < 0), ord, i => i.comp.nominal, lab);
+      R = { up, down, upCount: up.length, downCount: down.length,
+        nuevas: sortList(items.filter(i => i.estado === 'nueva'), ord, i => i.comp.nominal, lab),
+        eliminadas: sortList(items.filter(i => i.estado === 'eliminada'), ord, i => i.base.nominal, lab) };
+    }
+    $('up-title').textContent = byChange ? 'Mayores aumentos' : 'Aumentan';
+    $('down-title').textContent = byChange ? 'Mayores caídas' : 'Caen';
+    $('rank-unit').innerHTML = `Montos nominales de cada año. ${esc(varUnit())}. `
+      + (byChange ? 'Ordenado por el cambio en pesos (las 10 categorías que más se mueven en cada sentido).'
+        : `Todas las categorías que aumentan o caen, ordenadas por ${SORT_TEXT[ord]}${ord === 'alfa' ? '' : ` (monto de ${chip(state.b)})`}. La barra muestra la asignación de ${chip(state.b)}.`);
+    // La barra refleja el criterio: cambio en pesos, o asignación de B.
+    const val = i => byChange ? i[m].abs : i.comp.nominal;
     const max = Math.max(1e-9, ...R.up.map(i => Math.abs(val(i))), ...R.down.map(i => Math.abs(val(i))));
     const li = (i, dir) => `<li class="rank-item">
-        <span class="ri-name">${esc(labelOf(dim, i.parts[0]))}${i.negativo ? '<span class="flag">revisar: monto negativo</span>' : ''}</span>
+        <span class="ri-name">${esc(lab(i))}${i.negativo ? '<span class="flag">revisar: monto negativo</span>' : ''}</span>
         <span class="ri-bar" aria-hidden="true"><span class="${dir}" style="width:${Math.max(1.5, Math.abs(val(i)) / max * 100)}%"></span></span>
         <span class="ri-figs">
           <span class="${dirClass(i[m].abs)}"><strong>${arrow(i[m].abs)} ${fmtPct(i[m].pct)}</strong> (${fmtSignedAbbrev(i[m].abs)} ${modeWord()})</span>
@@ -278,10 +313,10 @@
     const none = t => `<li class="empty">${t}</li>`;
     $('rank-up').innerHTML = R.up.length ? R.up.map(i => li(i, 'up')).join('') : none('Ninguna categoría aumenta en este filtro.');
     $('rank-down').innerHTML = R.down.length ? R.down.map(i => li(i, 'down')).join('') : none('Ninguna categoría cae en este filtro.');
-    $('up-count').textContent = R.upCount > 10 ? `(10 de ${R.upCount})` : `(${R.upCount})`;
-    $('down-count').textContent = R.downCount > 10 ? `(10 de ${R.downCount})` : `(${R.downCount})`;
+    $('up-count').textContent = byChange && R.upCount > 10 ? `(10 de ${R.upCount})` : `(${R.upCount})`;
+    $('down-count').textContent = byChange && R.downCount > 10 ? `(10 de ${R.downCount})` : `(${R.downCount})`;
     const pl = (list, side, y) => list.length
-      ? list.map(i => `<li><span>${esc(labelOf(dim, i.parts[0]))}</span><span class="amt">${chip(y)} ${fmtAbbrev(i[side].nominal)}</span></li>`).join('')
+      ? list.map(i => `<li><span>${esc(lab(i))}</span><span class="amt">${chip(y)} ${fmtAbbrev(i[side].nominal)}</span></li>`).join('')
       : '<li class="empty">Ninguna.</li>';
     $('rank-new').innerHTML = pl(R.nuevas, 'comp', state.b);
     $('rank-gone').innerHTML = pl(R.eliminadas, 'base', state.a);
@@ -317,8 +352,9 @@
         },
       },
     });
+    const tableList = sortList([...list], state.compSort, i => i.comp.nominal, i => labelOf(dim, i.parts[0]));
     $('comp-table').innerHTML = `<thead><tr><th>${DIM_NAME[dim]}</th><th class="num">${chip(state.a)}</th><th class="num">${chip(state.b)}</th><th class="num">Cambio</th><th>Estado</th></tr></thead><tbody>${
-      list.map(i => `<tr><td class="label" title="${esc(labelOf(dim, i.parts[0]))}"><span class="swatch" style="background:${color.get(i.key) || REST}"></span>${esc(labelOf(dim, i.parts[0]))}</td>
+      tableList.map(i => `<tr><td class="label" title="${esc(labelOf(dim, i.parts[0]))}"><span class="swatch" style="background:${color.get(i.key) || REST}"></span>${esc(labelOf(dim, i.parts[0]))}</td>
         <td class="num">${fmtShare(i.nominal.partBase)}</td><td class="num">${fmtShare(i.nominal.partComp)}</td>
         <td class="num ${dirClass(i.nominal.pp)}">${i.nominal.pp == null ? '—' : arrow(i.nominal.pp) + ' ' + fmtPP(i.nominal.pp)}</td>
         <td><span class="estado ${i.estado}">${estadoShort(i.estado)}</span></td></tr>`).join('') || '<tr><td colspan="5" class="empty">Sin datos para este filtro.</td></tr>'}</tbody>`;
@@ -341,7 +377,8 @@
     let rows = rowsT.filter(i => i.estado !== 'sin_movimiento' && (!q || fold(labelOf(ra, i.parts[0])).includes(q)));
     const sorters = {
       abs: (x, y) => Math.abs(y[m].abs) - Math.abs(x[m].abs), up: (x, y) => y[m].abs - x[m].abs, down: (x, y) => x[m].abs - y[m].abs,
-      label: (x, y) => labelOf(ra, x.parts[0]).localeCompare(labelOf(ra, y.parts[0]), 'es'),
+      desc: (x, y) => y.comp.nominal - x.comp.nominal, asc: (x, y) => x.comp.nominal - y.comp.nominal,
+      label: (x, y) => byText(labelOf(ra, x.parts[0]), labelOf(ra, y.parts[0])),
     };
     rows.sort(sorters[state.crossSort]);
     const nRows = rows.length;
@@ -508,10 +545,11 @@
     const last = years[years.length - 1];
     items.sort((x, y) => y.byYear[last].nominal - x.byYear[last].nominal || y.byYear[x.firstYear].nominal - x.byYear[x.firstYear].nominal);
     if (dim !== 'total' && (!state.evoSel || ![...state.evoSel].every(k => items.some(i => i.key === k)))) {
-      state.evoSel = new Set(items.slice(0, 5).map(i => i.key));
+      state.evoSel = new Set(items.slice(0, 5).map(i => i.key));   // por defecto, las 5 de mayor monto
     }
     const lbl = i => i.key === 'total' ? 'Total' : labelOf(dim, i.parts[0]);
-    $('evo-intro').textContent = `Montos nominales de cada año (${years.map(y => `${y}: ${typeName(y)} ${versionOf(y) || ''}`.trim()).join(', ')}). ${varUnit()}. La variación acumulada se mide desde el primer año con asignación de cada categoría.`;
+    if (state.evoSort !== 'desc') sortList(items, state.evoSort, i => i.byYear[last].nominal, lbl);
+    $('evo-intro').textContent = `Montos nominales de cada año (${years.map(y => `${y}: ${typeName(y)} ${versionOf(y) || ''}`.trim()).join(', ')}). ${varUnit()}. La variación acumulada se mide desde el primer año con asignación de cada categoría.${dim === 'total' ? '' : ` Tabla ordenada por ${SORT_TEXT[state.evoSort]}${state.evoSort === 'alfa' ? '' : ` (monto de ${last})`}.`}`;
     $('evo-var-title').innerHTML = `Variación ${modeWord()} acumulada <span class="muted">(desde el primer año con asignación${m === 'real' ? `, precios de ${PB()}` : ''})</span>`;
 
     if (!total) {
@@ -575,8 +613,9 @@
     const m = state.mode, a = state.a, b = state.b;
     const { items, totals } = cmp(['geo']);
     const live = items.filter(i => i.estado !== 'sin_movimiento');
-    const comunas = live.filter(i => isComuna(i.parts[0])).sort((x, y) => geoNum(x.parts[0]) - geoNum(y.parts[0]));
-    const otras = live.filter(i => !isComuna(i.parts[0])).sort((x, y) => +x.parts[0] - +y.parts[0]);
+    const gl = i => labelOf('geo', i.parts[0]);
+    const comunas = sortList(live.filter(i => isComuna(i.parts[0])), state.comSort, i => i.comp.nominal, gl);
+    const otras = sortList(live.filter(i => !isComuna(i.parts[0])), state.comSort, i => i.comp.nominal, gl);
     const sum = (list, side, mo) => list.reduce((s, i) => s + i[side][mo], 0);
     const cA = sum(comunas, 'base', 'nominal'), cB = sum(comunas, 'comp', 'nominal');
     const cVar = M.pctChange(sum(comunas, 'base', m), sum(comunas, 'comp', m));
@@ -646,6 +685,75 @@
     if (state.comSel) $('com-sel').value = state.comSel;
     markComunaRow();
     renderComunaDetail();
+    renderComunaNominal();
+  }
+
+  /* ---- asignación nominal de cada comuna en un año (comparación entre comunas) ---- */
+  // Plugin propio: escribe el monto y la participación al final de cada barra y marca el promedio.
+  const barLabels = {
+    id: 'barLabels',
+    afterDatasetsDraw(chart, args, opts) {
+      if (!opts || !opts.enabled) return;
+      const { ctx, chartArea, scales: { x } } = chart;
+      const meta = chart.getDatasetMeta(0);
+      ctx.save();
+      if (opts.avg != null) {
+        const px = x.getPixelForValue(opts.avg);
+        ctx.strokeStyle = '#1C2431'; ctx.lineWidth = 1.2; ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(px, chartArea.top); ctx.lineTo(px, chartArea.bottom); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = '#1C2431'; ctx.font = '600 11px "Source Sans 3", sans-serif';
+        ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+        ctx.fillText('Promedio ' + fmtAbbrev(opts.avg), px + 4, chartArea.top - 2);
+      }
+      ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.fillStyle = '#3A4252'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+      meta.data.forEach((bar, k) => { const t = opts.text[k]; if (t) ctx.fillText(t, bar.x + 6, bar.y); });
+      ctx.restore();
+    },
+  };
+
+  function renderComunaNominal() {
+    const years = D.years;
+    if (state.comYear == null || !years.includes(state.comYear)) state.comYear = null;
+    const y = state.comYear == null ? state.b : state.comYear;
+    $('com-year').innerHTML = years.map(v => `<option value="${v}">${esc(yearLabel(v))}${versionOf(v) ? ' (' + versionOf(v) + ')' : ''}</option>`).join('');
+    $('com-year').value = y;
+    const evo = M.evolution(filtered(), years, ['geo']);
+    const gl = i => labelOf('geo', i.parts[0]);
+    const list = sortList(evo.filter(i => isComuna(i.parts[0]) && i.byYear[y].nominal !== 0), state.comNomSort, i => i.byYear[y].nominal, gl);
+    const amt = i => i.byYear[y].nominal;
+    const total = list.reduce((s, i) => s + amt(i), 0);
+    const avg = list.length ? total / list.length : null;
+    $('com-nom-unit').innerHTML = `Monto asignado a cada comuna en ${chip(y)}, en pesos corrientes de ese año (nominal), sin comparar contra otro año. Permite ver qué comunas reciben más y cuáles menos. Al lado de cada barra: monto y porcentaje sobre el total asignado a comunas. La línea punteada marca el promedio por comuna. Orden: ${SORT_TEXT[state.comNomSort]}.`;
+    if (!list.length) {
+      if (charts['com-nominal']) { charts['com-nominal'].destroy(); delete charts['com-nominal']; }
+      $('com-nom-note').innerHTML = 'No hay montos asignados a comunas para este año y filtro.';
+      return;
+    }
+    const colorFor = y === state.a ? COLOR_A : COLOR_B;
+    draw('com-nominal', {
+      type: 'bar',
+      data: { labels: list.map(gl), datasets: [{ label: yearLabel(y), data: list.map(amt), backgroundColor: list.map(i => amt(i) >= avg ? colorFor : colorFor + '99'), borderRadius: 2, barPercentage: 0.82, categoryPercentage: 0.9 }] },
+      plugins: [barLabels],
+      options: {
+        indexAxis: 'y',
+        layout: { padding: { right: 150, top: 16 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: c => `${fmtFull(c.raw)} nominales (${fmtShare(total ? c.raw / total : null)} del total en comunas)` } },
+          barLabels: { enabled: true, avg, text: list.map(i => `${fmtAbbrev(amt(i))} · ${fmtShare(total ? amt(i) / total : null)}`) },
+        },
+        scales: {
+          x: { beginAtZero: true, ticks: { callback: v => fmtAbbrev(v), font: MONO, maxTicksLimit: 6 }, title: { display: true, text: `Pesos corrientes de ${y} (nominal)`, font: FONT }, grid: { color: '#E4E0D2' } },
+          y: { ticks: { font: { ...FONT, weight: '600' } }, grid: { display: false } },
+        },
+      },
+    });
+    const byAmt = [...list].sort((p, q) => amt(q) - amt(p));
+    const hi = byAmt[0], lo = byAmt[byAmt.length - 1];
+    const above = list.filter(i => amt(i) >= avg).length;
+    $('com-nom-note').innerHTML = list.length > 1
+      ? `En ${chip(y)} las comunas suman <strong>${fmtAbbrev(total)}</strong> nominales. <strong>${esc(gl(hi))}</strong> es la de mayor asignación (${fmtAbbrev(amt(hi))}, ${fmtShare(amt(hi) / total)}) y <strong>${esc(gl(lo))}</strong> la de menor (${fmtAbbrev(amt(lo))}, ${fmtShare(amt(lo) / total)})${amt(lo) > 0 ? `: la primera recibe <strong>${nf(amt(hi) / amt(lo), 1)} veces</strong> lo que recibe la segunda` : ''}. ${above} de ${list.length} comunas están en el promedio o por encima (barras de color pleno).`
+      : `En ${chip(y)} sólo ${esc(gl(hi))} tiene monto asignado en este filtro: ${fmtAbbrev(amt(hi))}.`;
   }
 
   function markComunaRow() {
@@ -657,8 +765,11 @@
     if (!key) { $('com-det-table').innerHTML = '<tbody><tr><td class="empty">Sin comunas para este filtro.</td></tr></tbody>'; $('com-det-unit').textContent = ''; return; }
     const rows = filtered().filter(r => r.geo === key);
     const { items, totals } = cmp([dim], rows);
-    const list = items.filter(i => i.estado !== 'sin_movimiento').sort((x, y) => Math.abs(y[m].abs) - Math.abs(x[m].abs));
-    $('com-det-unit').innerHTML = `<strong>${esc(labelOf('geo', key))}</strong>: ${chip(state.a)} ${fmtAbbrev(totals.base.nominal)} → ${chip(state.b)} ${fmtAbbrev(totals.comp.nominal)} nominales; variación ${modeWord()} ${fmtPct(totals[m].pct)}. Ordenado por el tamaño del cambio. ${esc(varUnit())}.`;
+    const ord = state.comDetSort;
+    const list = items.filter(i => i.estado !== 'sin_movimiento');
+    if (ord === 'abs') list.sort((x, y) => Math.abs(y[m].abs) - Math.abs(x[m].abs));
+    else sortList(list, ord, i => i.comp.nominal, i => labelOf(dim, i.parts[0]));
+    $('com-det-unit').innerHTML = `<strong>${esc(labelOf('geo', key))}</strong>: ${chip(state.a)} ${fmtAbbrev(totals.base.nominal)} → ${chip(state.b)} ${fmtAbbrev(totals.comp.nominal)} nominales; variación ${modeWord()} ${fmtPct(totals[m].pct)}. Ordenado por ${ord === 'abs' ? 'el tamaño del cambio' : SORT_TEXT[ord] + (ord === 'alfa' ? '' : ` (monto de ${state.b})`)}. ${esc(varUnit())}.`;
     const head = `<thead><tr><th>${DIM_NAME[dim]}</th><th class="num">${chip(state.a)} nominal</th><th class="num">${chip(state.b)} nominal</th>
       <th class="num">Variación ${modeWord()} $</th><th class="num">Variación ${modeWord()} %</th><th class="num">Peso en ${chip(state.b)}</th><th class="num">Contribución al cambio</th><th>Estado</th></tr></thead>`;
     const body = list.map(i => `<tr><td class="label" title="${esc(labelOf(dim, i.parts[0]))}">${esc(labelOf(dim, i.parts[0]))}</td>

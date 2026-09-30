@@ -1,4 +1,4 @@
-# Comparación presupuestaria · Presupuesto CABA
+# ¿A dónde va la plata de la Ciudad? · Presupuesto CABA
 
 Tablero estático para comparar el presupuesto **Vigente** de la Ciudad
 Autónoma de Buenos Aires entre años, en pesos corrientes y a precios
@@ -49,7 +49,18 @@ para compartir una vista.
   tabla por comuna, desglose de cada comuna por jurisdicción, función o
   inciso (con la contribución de cada una al cambio) y una tabla aparte con
   las otras ubicaciones registradas (distritos escolares, zona externa a la
-  Ciudad, etc.).
+  Ciudad, etc.). Incluye además un gráfico de la **asignación nominal de cada
+  comuna** en el año que se elija, con su participación en el total de las
+  comunas y el promedio, para comparar cuánta plata recibe cada una.
+
+### Ordenar los datos
+
+Los rankings, la tabla de composición, los cruces, la tabla de Evolución y
+las tablas y gráficos de Comunas tienen un selector de orden: asignación de
+mayor a menor, de menor a mayor, o alfabético (con orden natural de números:
+Comuna 2 antes que Comuna 10). Donde tiene sentido se mantiene también el
+orden por tamaño del cambio en pesos. Se quitó el orden por cambio
+porcentual.
 
 ## Estructura
 

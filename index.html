@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Presupuesto CABA · Comparación presupuestaria</title>
-<meta name="description" content="Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años: montos nominales y variaciones reales o nominales por jurisdicción, función, inciso y comuna.">
+<title>¿A dónde va la plata de la Ciudad? · Presupuesto CABA</title>
+<meta name="description" content="¿A dónde va la plata de la Ciudad? Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años: montos nominales y variaciones reales o nominales por jurisdicción, función, inciso y comuna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -16,7 +16,8 @@
   <div class="wrap header-row">
     <div>
       <p class="kicker">Ciudad Autónoma de Buenos Aires — Presupuesto</p>
-      <h1 id="page-title">Comparación presupuestaria</h1>
+      <h1 id="page-title">¿A dónde va la plata de la Ciudad?</h1>
+      <p class="page-context" id="page-context"></p>
       <p class="subtitle">Los montos se muestran siempre en pesos corrientes de cada año (nominales), como figuran en las partidas. Las variaciones se pueden ver en términos reales, a precios de 2027, o nominales.</p>
     </div>
     <div class="header-meta">
@@ -89,15 +90,14 @@
               <select id="rank-dim"><option value="jur">Jurisdicción</option><option value="fun">Función</option><option value="inc">Inciso</option><option value="geo">Comuna o ubicación</option></select>
             </label>
             <label class="field inline"><span>Ordenar por</span>
-              <select id="rank-order"><option value="abs">Cambio en pesos</option><option value="pct">Cambio porcentual</option></select>
+              <select id="rank-order"><option value="abs">Mayor cambio en pesos</option><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="alfa">Alfabético (A–Z)</option></select>
             </label>
           </div>
         </div>
         <p class="unit-line" id="rank-unit"></p>
-        <p class="warn-note" id="pct-warning" hidden>Ordenar por porcentaje destaca categorías con montos chicos, donde un cambio pequeño en pesos produce un porcentaje grande. Mirá la participación de cada fila antes de sacar conclusiones.</p>
         <div class="rank-grid">
-          <div><h3 class="rank-title up">Mayores aumentos <span class="count" id="up-count"></span></h3><ol class="rank-list" id="rank-up"></ol></div>
-          <div><h3 class="rank-title down">Mayores caídas <span class="count" id="down-count"></span></h3><ol class="rank-list" id="rank-down"></ol></div>
+          <div><h3 class="rank-title up"><span id="up-title">Mayores aumentos</span> <span class="count" id="up-count"></span></h3><ol class="rank-list" id="rank-up"></ol></div>
+          <div><h3 class="rank-title down"><span id="down-title">Mayores caídas</span> <span class="count" id="down-count"></span></h3><ol class="rank-list" id="rank-down"></ol></div>
         </div>
         <div class="rank-grid special">
           <div><h3 class="rank-title new">Con asignación en <span class="js-yb"></span> y sin asignación en <span class="js-ya"></span> <span class="count" id="new-count"></span></h3><ul class="plain-list" id="rank-new"></ul></div>
@@ -117,6 +117,11 @@
         </div>
         <p class="unit-line">Participación de cada categoría en el total de cada año, sobre montos nominales. El cambio se mide en puntos porcentuales (pp).</p>
         <div class="comp-chart"><canvas id="comp-chart" role="img" aria-label="Barras apiladas al 100 % con la composición del gasto en el año A y en el año B. La tabla de abajo tiene los mismos datos."></canvas></div>
+        <div class="cross-controls">
+          <label class="field inline"><span>Ordenar tabla</span>
+            <select id="comp-sort"><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="alfa">Alfabético (A–Z)</option></select>
+          </label>
+        </div>
         <div class="table-scroll comp-table-wrap"><table class="data-table" id="comp-table"></table></div>
       </section>
 
@@ -136,7 +141,7 @@
             <select id="cross-top"><option value="10">Top 10</option><option value="15" selected>Top 15</option><option value="25">Top 25</option><option value="all">Ver todas</option></select>
           </label>
           <label class="field inline"><span>Ordenar filas</span>
-            <select id="cross-sort"><option value="abs">Mayor cambio</option><option value="up">Mayor aumento</option><option value="down">Mayor caída</option><option value="label">Alfabético</option></select>
+            <select id="cross-sort"><option value="abs">Mayor cambio</option><option value="up">Mayor aumento</option><option value="down">Mayor caída</option><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="label">Alfabético (A–Z)</option></select>
           </label>
         </div>
         <div class="legend" id="cross-legend"></div>
@@ -177,9 +182,14 @@
       <section class="card" aria-labelledby="h-evo">
         <div class="card-head">
           <h2 id="h-evo">Evolución <span class="js-range">2023–2026</span></h2>
+          <div class="card-controls">
           <label class="field inline"><span>Ver</span>
             <select id="evo-dim"><option value="total">Total</option><option value="jur">Por jurisdicción</option><option value="fun">Por función</option><option value="inc">Por inciso</option><option value="geo">Por comuna o ubicación</option></select>
           </label>
+          <label class="field inline" id="evo-sort-wrap"><span>Ordenar tabla</span>
+            <select id="evo-sort"><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="alfa">Alfabético (A–Z)</option></select>
+          </label>
+          </div>
         </div>
         <p class="unit-line" id="evo-intro"></p>
         <p class="filter-line js-filter-line" hidden></p>
@@ -202,10 +212,31 @@
   <!-- ===================== COMUNAS ===================== -->
   <section id="panel-comunas" role="tabpanel" aria-labelledby="tab-comunas" hidden>
     <main class="wrap stack">
+      <section class="card" aria-labelledby="h-com-nom">
+        <div class="card-head">
+          <h2 id="h-com-nom">¿Cuánta plata tiene asignada cada comuna?</h2>
+          <div class="card-controls">
+            <label class="field inline"><span>Año</span><select id="com-year"></select></label>
+            <label class="field inline"><span>Ordenar</span>
+              <select id="com-nom-sort"><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="alfa">Por número de comuna</option></select>
+            </label>
+          </div>
+        </div>
+        <p class="unit-line" id="com-nom-unit"></p>
+        <p class="filter-line js-filter-line" hidden></p>
+        <div class="com-nom-chart"><canvas id="com-nominal" role="img" aria-label="Asignación nominal de cada comuna en el año elegido, con su participación en el total de las comunas y el promedio. La tabla de abajo tiene los mismos datos."></canvas></div>
+        <p class="com-note" id="com-nom-note"></p>
+      </section>
+
       <section class="card" aria-labelledby="h-com">
         <div class="card-head">
-          <h2 id="h-com">Presupuesto por comuna</h2>
-          <button type="button" class="link-btn" id="to-evo-geo">Ver la evolución por comuna</button>
+          <h2 id="h-com">Cómo cambia el presupuesto de cada comuna</h2>
+          <div class="card-controls">
+            <label class="field inline"><span>Ordenar</span>
+              <select id="com-sort"><option value="alfa">Por número de comuna</option><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option></select>
+            </label>
+            <button type="button" class="link-btn" id="to-evo-geo">Ver la evolución por comuna</button>
+          </div>
         </div>
         <p class="unit-line">Cada partida del presupuesto registra una ubicación geográfica. Acá se suman los montos según esa ubicación.</p>
         <p class="filter-line js-filter-line" hidden></p>
@@ -229,6 +260,9 @@
           <h2 id="h-com-det">¿Qué explica el presupuesto de la comuna?</h2>
           <div class="card-controls">
             <label class="field inline"><span>Comuna o ubicación</span><select id="com-sel"></select></label>
+            <label class="field inline"><span>Ordenar</span>
+              <select id="com-det-sort"><option value="abs">Mayor cambio en pesos</option><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="alfa">Alfabético (A–Z)</option></select>
+            </label>
             <div class="subtabs" role="tablist" aria-label="Desglose" id="com-det-tabs">
               <button type="button" role="tab" data-dim="jur" aria-selected="true">Jurisdicción</button>
               <button type="button" role="tab" data-dim="fun" aria-selected="false">Función</button>

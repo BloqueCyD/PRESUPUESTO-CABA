@@ -269,3 +269,11 @@ table.selectable tbody tr.is-selected td{background:rgba(180,121,30,.13)}
 
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 .years{flex:0 1 auto}
+
+/* ---- Título fijo + contexto de la comparación ---- */
+.page-context{font-family:var(--mono);font-size:13px;letter-spacing:.02em;color:#E3C98E;margin:-4px 0 12px}
+
+/* ---- Asignación nominal por comuna ---- */
+.com-nom-chart{height:520px;position:relative;margin:8px 0 14px}
+#com-nom-note{margin:4px 0 0;font-size:16.5px}
+@media (max-width:760px){.com-nom-chart{height:560px}#com-nom-note{font-size:15.5px}}
