@@ -10,42 +10,46 @@ Construido según el documento *Especificaciones para rearmar el tablero de
 Presupuesto CABA* (v1.0, 30/9/2026), con una única fuente de datos:
 `presupuesto_caba_historico_real_2027_limpio.csv`.
 
-## Estado actual: Proyecto 2027 pendiente
+## Cómo se leen los números
 
-La especificación compara el Vigente 2023–2026 contra el **Proyecto de
-Presupuesto 2027**. Ese archivo todavía no fue entregado, así que:
-
-- el año comparado es, por ahora, el último Vigente disponible (**2026**);
-- el año base se elige entre 2023, 2024 y 2025 (por defecto, **2025**);
-- los montos reales ya están expresados a precios de 2027 con los IPC de la
-  especificación, así que no cambian cuando se cargue el Proyecto;
-- la página lo avisa con una franja visible debajo del encabezado.
-
-Cuando se cargue el Proyecto 2027, el año comparado pasa a ser 2027 y el año
-base por defecto 2026, tal como pide la especificación, sin tocar el
-frontend (ver "Cómo cargar el Proyecto 2027").
+- **Los montos son siempre nominales**: pesos corrientes de cada año, tal
+  como figuran en las partidas presupuestarias.
+- **Sólo las variaciones** se pueden ver en términos **reales** (a precios de
+  2027, con el IPC promedio de cada año) o **nominales**. Los montos reales
+  se calculan en `build_data.py`; la página sólo los usa para las variaciones.
+- **Los años se eligen libremente**: Año A y Año B pueden ser cualquier par.
+  La variación siempre va de A a B. Cada año tiene un color fijo (A gris
+  azulado, B ocre) que se repite en tarjetas, gráficos, tablas y encabezados,
+  y cada monto lleva la etiqueta de su año, su tipo (Vigente o Proyecto) y su
+  corte (T4 o T2).
+- El Proyecto 2027 todavía no está cargado: hoy se puede comparar entre 2023
+  y 2026. Cuando se cargue, 2027 aparece como una opción más y pasa a ser el
+  Año B por defecto (con 2026 como Año A), como pide la especificación.
 
 ## Qué incluye
 
-- **Controles persistentes**: año base, Real o Nominal (Real por defecto) y
-  filtros de Jurisdicción, Función e Inciso aplicados a ambos años. El
-  estado se guarda en la URL (`?base=2024&modo=nominal&jur=40`) para
-  compartir un recorte.
-- **Grandes números**: base, comparado, variación nominal y variación real
-  (con mayor jerarquía) y una frase de síntesis automática.
-- **¿Dónde aumenta y dónde cae?**: rankings de aumentos y caídas por
-  jurisdicción, función o inciso, ordenados por cambio absoluto (o
-  porcentual, con advertencia de bases chicas), y listas de categorías
-  nuevas y sin asignación.
-- **Composición**: barras apiladas al 100 % y tabla con el cambio de
-  participación en puntos porcentuales.
-- **Tres cruces**: Jurisdicción × Inciso, Función × Inciso y Jurisdicción ×
-  Función, como matriz de calor con panel de detalle por celda (en móvil,
-  lista expandible), búsqueda, top N y orden.
-- **Tabla completa** ordenable, buscable y exportable a CSV con valores
-  completos, unidad, tipo de presupuesto y recorte en cada fila.
-- **Metodología y fuentes**: IPC, factores, fórmulas, procedencia de cada
-  período, controles del build y casos para revisión humana.
+Tres pestañas, con los mismos controles arriba (años, variaciones reales o
+nominales y filtros de Jurisdicción, Función, Inciso y Comuna o ubicación).
+El estado se guarda en la URL (`?tab=comunas&a=2023&b=2026&modo=nominal`)
+para compartir una vista.
+
+- **Comparación entre dos años**: montos de A y B, variación nominal y real,
+  frase de síntesis; rankings de aumentos y caídas por jurisdicción, función,
+  inciso o comuna; composición al 100 %; los tres cruces (Jurisdicción ×
+  Inciso, Función × Inciso, Jurisdicción × Función) como matriz con detalle
+  por celda; tabla completa exportable a CSV (incluye Comuna ×
+  Jurisdicción).
+- **Evolución**: todos los años juntos (nunca sumados). Total o apertura por
+  jurisdicción, función, inciso o comuna; gráfico de montos nominales por
+  año, gráfico de variación acumulada (real o nominal) con el total como
+  referencia, y tabla con los montos de cada año, la variación interanual y
+  la acumulada. Se pueden marcar hasta 8 filas para graficar.
+- **Comunas**: monto registrado en comunas en A y B, cuánto concentran las
+  dos comunas con más monto, gráficos de montos y de variación por comuna,
+  tabla por comuna, desglose de cada comuna por jurisdicción, función o
+  inciso (con la contribución de cada una al cambio) y una tabla aparte con
+  las otras ubicaciones registradas (distritos escolares, zona externa a la
+  Ciudad, etc.).
 
 ## Estructura
 
@@ -55,7 +59,7 @@ frontend (ver "Cómo cargar el Proyecto 2027").
 ├── app.js              → interfaz (render, filtros, URL, exportación)
 ├── metrics.js          → funciones puras de comparación (compartidas con las pruebas)
 ├── chart.umd.min.js    → Chart.js 4.4.4 vendorizado (sin CDN)
-├── presupuesto.json    → datos generados por build_data.py
+├── presupuesto.json    → datos generados por build_data.py (unos 240 KB)
 ├── build_data.py       → fuentes CSV → presupuesto.json, con validaciones
 ├── test_build.py       → pruebas del build (Python)
 ├── test_metrics.js     → pruebas de las métricas (Node)
@@ -68,7 +72,7 @@ frontend (ver "Cómo cargar el Proyecto 2027").
 1. Copiá `presupuesto_caba_historico_real_2027_limpio.csv` en `fuentes/`.
    Pesa unos 130 MB: GitHub rechaza archivos de más de 100 MB, por eso
    `fuentes/*.csv` está en `.gitignore`. El sitio publicado sólo necesita
-   `presupuesto.json` (unos 72 KB).
+   `presupuesto.json` (unos 240 KB).
 2. Corré `python3 build_data.py` (Python 3.9 o superior, sin dependencias).
    Imprime el resumen de validación y termina con error si algo falla.
 3. Corré las pruebas: `python3 test_build.py` y `node test_metrics.js`.
@@ -105,8 +109,16 @@ Para verlo en local: `python3 -m http.server 8000` y abrí
 ## Limitaciones conocidas
 
 - **2026 es Vigente al T2** (corte del segundo trimestre), mientras que
-  2023–2025 son T4. La página muestra el corte de cada año junto a cada
-  monto base y comparado.
+  2023–2025 son T4. La página muestra el corte en los selectores de año, en
+  las tarjetas y en los encabezados de Evolución.
+- **Comunas**: se usa la ubicación geográfica que registra cada partida
+  (`Geo` / `Desc_Geo`). Toda la fuente tiene ubicación, así que la suma de
+  ubicaciones es igual al total. La pestaña agrupa como "comunas" las
+  ubicaciones cuyo nombre empieza con "Comuna" (la fuente incluye una
+  "Comuna 16" con montos mínimos en 2024) y muestra el resto aparte.
+- La metodología completa (IPC, fórmulas, procedencia y controles del
+  build) no se muestra en la página: está en este README, en
+  `DICCIONARIO.md` y en `meta` dentro de `presupuesto.json`.
 - **Jurisdicción 31** figura como "Min.Infraestructura" en 2024–2025 y como
   "Ministerio De Movilidad E Infraestructura" en 2026. Se agrupa por código
   (se muestra el nombre más reciente) y queda listada para revisión.

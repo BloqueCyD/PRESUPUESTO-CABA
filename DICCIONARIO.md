@@ -34,6 +34,7 @@ Totales nominales de la fuente (columna `Vigente`):
 | Jurisdicción | `Jur` | `Desc_Jur` | |
 | Función | `Fin` + `.` + `Fun` (ej. `3.1`) | `Desc_Fun` | El código `Fun` solo se repite entre finalidades (el 1 es Legislativa, Salud, Deuda…), por eso la clave es compuesta. |
 | Inciso | `Inciso` | `Desc_Inc` | |
+| Comuna o ubicación | `Geo` | `Desc_Geo` | Ubicación geográfica que registra cada partida: comunas, distritos escolares y "Zona Externa A La Ciudad". |
 
 Normalización de etiquetas: recorte de espacios, Unicode NFC y espacios
 internos colapsados. La capitalización no define identidad. Si un mismo
@@ -45,13 +46,13 @@ No se aplica ninguna equivalencia entre códigos distintos
 (`EQUIVALENCIAS` vacío). Las claves que sólo tienen monto en algunos años se
 listan en `meta.review.presencia_parcial`.
 
-## `presupuesto.json` (schema_version 2)
+## `presupuesto.json` (schema_version 3)
 
 ```json
 {
   "meta": {
-    "schema_version": 2, "generated_at": "…", "price_base": 2027,
-    "compared_year_spec": 2027, "compared_year": 2026, "default_base_year": 2025,
+    "schema_version": 3, "generated_at": "…", "price_base": 2027,
+    "compared_year_spec": 2027, "default_compared_year": 2026, "default_base_year": 2025,
     "proyecto_2027_disponible": false,
     "ipc_average": {"2023": 397.16, "2024": 1295.33, "2025": 1896.37, "2026": 2501.96, "2027": 3020.12},
     "factor_a_precios_2027": {"2023": 7.604…, …, "2027": 1.0},
@@ -61,26 +62,36 @@ listan en `meta.review.presencia_parcial`.
                  "filas_sin_dato", "total_nominal", "sha256"}, …],
     "validation_summary": {"ok": true, "controles": […], "advertencias": […]},
     "review": {"etiquetas": […], "presencia_parcial": […], "equivalencias_aplicadas": {…}},
-    "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "monto_nominal", "monto_real_2027"]
+    "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "geo_idx", "monto_nominal", "monto_real_2027"]
   },
   "dimensions": {
     "periodos": [2023, 2024, 2025, 2026],
     "jurisdicciones": [{"id": "1", "label": "…"}, …],
     "funciones": [{"id": "1.1", "label": "…", "fin_id": "1", "fin_label": "…"}, …],
-    "incisos": [{"id": "1", "label": "…"}, …]
+    "incisos": [{"id": "1", "label": "…"}, …],
+    "ubicaciones": [{"id": "1", "label": "Comuna 1"}, …]
   },
-  "rows": [[0, 0, 0, 0, 1234.0, 9383.6], …]
+  "rows": [[0, 0, 0, 0, 0, 1234.0, 9383.6], …]
 }
 ```
 
 Cada fila de `rows` es una celda del grano **año × jurisdicción × función ×
-inciso**. De ese único grano se derivan sin pérdida el total general, los
-totales por jurisdicción, función e inciso y los tres cruces. El build
+inciso × ubicación**. De ese único grano se derivan sin pérdida el total
+general, los totales por jurisdicción, función, inciso y ubicación, los tres
+cruces y el cruce Comuna × Jurisdicción. El build
 verifica que esos agregados reconcilien con las sumas calculadas
 directamente sobre las filas del CSV (tolerancia 0,01 pesos).
 
-`compared_year` y `default_base_year` siguen la especificación (2027 y 2026)
-cuando el Proyecto está cargado; mientras falta, son 2026 y 2025.
+`default_base_year` y `default_compared_year` son sólo los años que la página
+propone al abrirse (Año A y Año B); el usuario puede elegir cualquier par.
+Siguen la especificación (2026 y 2027) cuando el Proyecto está cargado;
+mientras falta, son 2025 y 2026.
+
+## Presentación
+
+Los montos se muestran siempre nominales. `monto_real_2027` se usa sólo
+para calcular variaciones reales. Las participaciones se calculan sobre
+montos nominales (dentro de un mismo año coinciden con las reales).
 
 ## Metodología
 
@@ -91,7 +102,8 @@ variacion_abs              = comparado − base
 variacion_pct              = (comparado / base − 1) × 100
 participacion              = monto_categoria / total del mismo año (del recorte filtrado)
 cambio_participacion_pp    = participacion_comparada − participacion_base
-contribucion               = variacion_abs de la categoría / variacion_abs del total del recorte
+contribucion               = variacion_abs de la categoría / variacion_abs del total del filtro
+variacion_acumulada(año)   = monto(año) / monto(primer año con asignación) − 1   (pestaña Evolución)
 ```
 
 El factor se calcula con aritmética decimal y no se redondea antes de
@@ -100,10 +112,10 @@ exportarlos (a centavos).
 
 | Estado | Condición | Etiqueta |
 |---|---|---|
-| Nueva | base = 0 y comparado > 0 | Nueva en AAAA (porcentaje: no aplica) |
-| Sin asignación | base > 0 y comparado = 0 | Sin asignación en AAAA (−100 %) |
-| Continúa | base > 0 y comparado > 0 | Continúa |
-| Sin movimiento | base = 0 y comparado = 0 | Oculta por defecto |
+| Nueva | A = 0 y B > 0 | Nueva en B (porcentaje: no aplica) |
+| Sin asignación | A > 0 y B = 0 | Sin asignación en B (−100 %) |
+| Continúa | A > 0 y B > 0 | Continúa |
+| Sin movimiento | A = 0 y B = 0 | Oculta por defecto |
 
 El estado se calcula sobre la unión de claves de ambos años, en cada
 dimensión simple y en cada cruce con la clave compuesta completa. Los
@@ -113,9 +125,9 @@ signo y se marcan para revisión (en esta fuente no hay ninguno).
 
 ## CSV exportado
 
-Una fila por categoría o cruce visible, más el total del recorte (y un
+Una fila por categoría o cruce visible, más el total del filtro (y un
 subtotal de las filas exportadas cuando la búsqueda o el top N ocultan
-filas). Columnas: `anio_base`, `tipo_base`, `anio_comparado`,
-`tipo_comparado`, id y etiqueta de cada dimensión, montos base y comparado
-en nominal y real, variaciones absolutas y porcentuales en ambos modos,
-participaciones, cambio en pp, estado, unidades y recorte aplicado.
+filas). Columnas: `anio_a`, `tipo_a`, `anio_b`, `tipo_b`, id y etiqueta de
+cada dimensión, montos nominales de A y B, variación nominal y real
+(absoluta y porcentual; la real en pesos de 2027), participaciones, cambio
+en pp, estado, unidades y filtro aplicado.

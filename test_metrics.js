@@ -7,7 +7,7 @@ const assert = require('assert');
 const M = require('./metrics.js');
 
 const D = M.decode(JSON.parse(fs.readFileSync(path.join(__dirname, 'presupuesto.json'), 'utf8')));
-const COMP = D.meta.compared_year;
+const COMP = D.meta.default_compared_year;
 let pass = 0, fail = 0;
 function t(name, fn) {
   try { fn(); pass++; console.log('  ✓ ' + name); }
@@ -77,6 +77,25 @@ t('real = nominal × factor de la especificación', () => {
     const tot = M.totalsOf(all, y);
     close(tot.real, tot.nominal * (3020.12 / D.meta.ipc_average[String(y)]), 0.05);
   }
+});
+t('comuna: suma de ubicaciones = total, y filtro por comuna', () => {
+  const it = M.compare(all, 2025, 2026, ['geo']);
+  close(it.items.reduce((s, i) => s + i.comp.nominal, 0), it.totals.comp.nominal);
+  const c1 = M.applyFilters(all, { geo: it.items[0].key });
+  assert.ok(c1.length > 0 && c1.every(r => r.geo === it.items[0].key));
+});
+t('cualquier par de años (incluido A > B) da métricas coherentes', () => {
+  const x = M.compare(all, 2026, 2024, ['jur']).totals, y = M.compare(all, 2024, 2026, ['jur']).totals;
+  close(x.real.abs, -y.real.abs); close((1 + x.real.pct / 100) * (1 + y.real.pct / 100), 1, 1e-12);
+});
+t('evolución: acumulada del total = variación directa primer→último año', () => {
+  const e = M.evolution(all, D.years, [])[0];
+  const d = M.compare(all, D.years[0], D.years[D.years.length - 1], ['jur']).totals;
+  close(e.real.total, d.real.pct, 1e-9); close(e.nominal.total, d.nominal.pct, 1e-9);
+});
+t('evolución: categoría que aparece después acumula desde su primer año', () => {
+  const g = M.evolution(all, D.years, ['jur']).find(i => i.key === '29');
+  assert.strictEqual(g.firstYear, 2024); assert.strictEqual(g.real.cum[2023], null); assert.strictEqual(g.real.cum[2024], 0);
 });
 t('filtro: ambos años usan el mismo recorte', () => {
   const f = M.applyFilters(all, { jur: '40' });

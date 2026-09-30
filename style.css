@@ -213,3 +213,59 @@ table.matrix td.rowtotal{border-left:2px solid var(--line)}
 @media (max-width:760px){.rank-grid{grid-template-columns:minmax(0,1fr)}}
 .comp-table-wrap{max-height:420px}
 @media (max-width:760px){.cell-detail{display:none}}
+
+/* ---- v2: años A/B, pestañas, evolución, comunas ---- */
+:root{--year-a:#445066;--year-b:#B4791E}
+.years{border:1px solid var(--line);border-radius:3px;background:#fff;padding:6px 12px 8px;margin:0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px 10px}
+.years legend{font-size:12.5px;color:var(--ink-soft);padding:0 4px}
+.year-pick{display:flex;flex-direction:column;gap:3px}
+.year-pick > span{font-size:12px;font-weight:700;padding:1px 8px;border-radius:2px;align-self:flex-start}
+.year-pick.a > span{background:var(--year-a);color:#fff}
+.year-pick.b > span{background:var(--year-b);color:#20160A}
+.year-pick select{padding:6px 8px;border:1px solid #BFB8A4;border-radius:2px;background:#fff;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink)}
+.year-pick.a select{border-left:4px solid var(--year-a)}
+.year-pick.b select{border-left:4px solid var(--year-b)}
+.arrow-sep{font-size:18px;color:var(--ink-soft);padding-bottom:6px}
+.years-note{flex-basis:100%;margin:2px 0 0;font-size:12px;color:var(--ink-soft)}
+.years.is-disabled .year-pick,.years.is-disabled .arrow-sep{opacity:.45}
+
+.yr{display:inline-block;font-family:var(--sans);font-weight:700;font-size:.86em;line-height:1.35;padding:0 6px;border-radius:2px;white-space:nowrap;vertical-align:baseline}
+.yr.a{background:var(--year-a);color:#fff}
+.yr.b{background:var(--year-b);color:#20160A}
+.yr.plain{background:#E7E2D3;color:var(--ink)}
+.ver{font-family:var(--mono);font-size:11px;color:#6E6857;font-weight:400}
+
+.main-tabs{display:flex;gap:8px;flex-wrap:wrap;padding-top:18px;padding-bottom:4px}
+.main-tabs button{font-family:var(--sans);font-size:15px;font-weight:600;background:#fff;border:1px solid var(--line);padding:9px 18px;border-radius:18px;color:var(--ink-soft);cursor:pointer}
+.main-tabs button:hover{border-color:var(--gold)}
+.main-tabs button[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:#FBF9F3}
+#panel-comparacion .kpis{margin-top:12px;border-top:1px solid var(--line)}
+
+.kpi.a{box-shadow:inset 0 4px 0 var(--year-a)}
+.kpi.b{box-shadow:inset 0 4px 0 var(--year-b)}
+.kpi .full{font-family:var(--mono);font-size:11px;color:#6E6857;margin:4px 0 0;word-break:break-all}
+.kpi.dim .value{font-size:22px}
+
+.evo-charts,.com-charts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;margin:6px 0 18px}
+.evo-fig{margin:0;background:#fff;border:1px solid var(--line);padding:12px 14px}
+.evo-fig figcaption{font-family:var(--serif);font-weight:600;font-size:15.5px;margin-bottom:8px}
+.evo-chart{height:300px;position:relative}
+.com-chart{height:560px;position:relative}
+.sub-h{font-size:17px;margin:4px 0 10px}
+table.data-table td.sel{width:28px}
+table.data-table tr.total-row td{font-weight:700;background:rgba(180,121,30,.07)}
+table.data-table th .yr{font-size:11.5px}
+table.selectable tbody tr{cursor:pointer}
+table.selectable tbody tr.is-selected td{background:rgba(180,121,30,.13)}
+.row-btn{all:unset;cursor:pointer;font-weight:600;color:var(--ink)}
+.row-btn:focus-visible{outline:2px solid var(--gold-deep)}
+.com-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line);background:#fff;margin-bottom:12px}
+.com-summary .kpi{border-right:1px solid var(--line)}
+.com-summary .kpi:last-child{border-right:none}
+.com-note{font-family:var(--serif);font-size:18px;line-height:1.4;margin:0 0 16px;max-width:75ch}
+
+@media (max-width:1000px){.evo-charts,.com-charts{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:760px){.com-summary{grid-template-columns:minmax(0,1fr)}.com-summary .kpi{border-right:none;border-bottom:1px solid var(--line)}.com-chart{height:520px}.main-tabs button{font-size:14px;padding:8px 13px}}
+
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.years{flex:0 1 auto}

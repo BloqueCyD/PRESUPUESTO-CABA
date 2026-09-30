@@ -17,8 +17,8 @@ Reglas (documento "Especificaciones para rearmar el tablero de Presupuesto CABA"
     con los IPC exactos de la especificación y sin redondear el factor.
   * El build termina con código distinto de cero ante cualquier error crítico.
 
-Salida: presupuesto.json (schema_version 2) con un único grano
-año × jurisdicción × función × inciso, del que se derivan sin pérdida los
+Salida: presupuesto.json (schema_version 3) con un único grano
+año × jurisdicción × función × inciso × ubicación geográfica, del que se derivan sin pérdida los
 totales simples y los tres cruces obligatorios. El build verifica que los
 totales derivados de ese grano reconcilien con los calculados directamente
 sobre las filas originales.
@@ -40,7 +40,7 @@ getcontext().prec = 50
 HERE = Path(__file__).resolve().parent
 FUENTES = HERE / "fuentes"
 OUT_PATH = HERE / "presupuesto.json"
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # ---------------------------------------------------------------------------
 # Constantes de la especificación (sección 6.1). No modificar sin cambiar la
@@ -79,12 +79,14 @@ DIM_COLUMNS = {
     "fun": {"codigo": ["Fin", "Fun"], "label": "Desc_Fun"},  # Fun solo no es único: la clave es Fin.Fun
     "fin": {"codigo": ["Fin"], "label": "Desc_Fin"},
     "inc": {"codigo": ["Inciso"], "label": "Desc_Inc"},
+    "geo": {"codigo": ["Geo"], "label": "Desc_Geo"},  # ubicación geográfica registrada (comunas y otras)
 }
+GRAIN_DIMS = ("jur", "fun", "inc", "geo")
 
 # Mapa explícito de equivalencias entre claves (reorganizaciones confirmadas).
 # Vacío a propósito: ninguna equivalencia fue confirmada. Formato:
 #   {"jur": {"<clave_vieja>": "<clave_nueva>"}}
-EQUIVALENCIAS = {"jur": {}, "fun": {}, "inc": {}}
+EQUIVALENCIAS = {"jur": {}, "fun": {}, "inc": {}, "geo": {}}
 
 
 class BuildError(Exception):
@@ -282,7 +284,7 @@ def presence_report(records, chosen):
     """Claves que no están en todos los años (surgirán como nuevas/eliminadas)."""
     out = []
     years = sorted(records)
-    for dim in ("jur", "fun", "inc"):
+    for dim in GRAIN_DIMS:
         pres = defaultdict(set)
         for y in years:
             for keys, _, amt in records[y]:
@@ -319,29 +321,28 @@ def build(require_2027=False):
     def sort_key(k):
         return [int(p) if p.isdigit() else 10**9 for p in k.split(".")]
     dims = {}
-    for dim in ("jur", "fun", "inc"):
-        ks = sorted(chosen[dim], key=sort_key)
-        dims[dim] = ks
+    for dim in GRAIN_DIMS:
+        dims[dim] = sorted(chosen[dim], key=sort_key)
     idx = {dim: {k: i for i, k in enumerate(ks)} for dim, ks in dims.items()}
 
-    # Grano: año × jur × fun × inc (suma exacta en Decimal).
+    # Grano: año × jur × fun × inc × geo (suma exacta en Decimal).
     grain = defaultdict(Decimal)
-    direct = {"total": defaultdict(Decimal), "jur": defaultdict(Decimal),
-              "fun": defaultdict(Decimal), "inc": defaultdict(Decimal)}
+    direct = {"total": defaultdict(Decimal), **{d: defaultdict(Decimal) for d in GRAIN_DIMS}}
     for y in years:
         for keys, _, amt in records[y]:
-            grain[(y, keys["jur"], keys["fun"], keys["inc"])] += amt
+            grain[(y,) + tuple(keys[d] for d in GRAIN_DIMS)] += amt
             direct["total"][y] += amt
-            for d in ("jur", "fun", "inc"):
+            for d in GRAIN_DIMS:
                 direct[d][(y, keys[d])] += amt
 
     factors = {y: factor_a_precios_2027(y) for y in IPC_PROMEDIO}
+    NOM, REAL = 1 + len(GRAIN_DIMS), 2 + len(GRAIN_DIMS)
     rows = []
-    for (y, j, fu, inc), nom in sorted(grain.items(), key=lambda kv: (kv[0][0], idx["jur"][kv[0][1]],
-                                                                        idx["fun"][kv[0][2]], idx["inc"][kv[0][3]])):
+    for key, nom in sorted(grain.items(), key=lambda kv: (kv[0][0],) + tuple(idx[d][kv[0][i + 1]] for i, d in enumerate(GRAIN_DIMS))):
+        y = key[0]
         real = nom if y == PRICE_BASE else nom * factors[y]
-        rows.append([years.index(y), idx["jur"][j], idx["fun"][fu], idx["inc"][inc],
-                     dec_to_float(nom), dec_to_float(real)])
+        rows.append([years.index(y)] + [idx[d][key[i + 1]] for i, d in enumerate(GRAIN_DIMS)]
+                    + [dec_to_float(nom), dec_to_float(real)])
 
     # ---------------- Validaciones y reconciliaciones ----------------
     checks = []
@@ -353,7 +354,7 @@ def build(require_2027=False):
 
     check("Cuatro períodos Vigente (2023–2026)", vig == [2023, 2024, 2025, 2026], str(vig))
     check("Proyecto 2027 cargado", not missing_2027,
-          "pendiente de entrega: la vista compara el último Vigente disponible" if missing_2027 else "")
+          "pendiente de entrega" if missing_2027 else "")
     check("Ninguna columna de monto es Sanción/Definitivo/Devengado",
           all(SOURCES[y]["columna_monto"].casefold() not in FORBIDDEN_AMOUNT_COLUMNS for y in years),
           ", ".join(f"{y}: {SOURCES[y]['columna_monto']}" for y in years))
@@ -361,9 +362,9 @@ def build(require_2027=False):
           True, ", ".join(f"{y}: {v}" for y, v in IPC_PROMEDIO.items()))
     check("Factor 2027 = 1", factors[2027] == 1, str(factors[2027]))
 
-    all_finite = all(math.isfinite(r[4]) and math.isfinite(r[5]) for r in rows)
+    all_finite = all(math.isfinite(r[NOM]) and math.isfinite(r[REAL]) for r in rows)
     check("Sin NaN ni Infinity en montos", all_finite)
-    negs = sum(1 for r in rows if r[4] < 0)
+    negs = sum(1 for r in rows if r[NOM] < 0)
     # Los negativos no hacen fallar el build: se conservan con su signo y se marcan para revisión.
     check("Montos negativos en el grano (se conservan y se marcan)", True, f"{negs} agregados negativos")
     if negs:
@@ -371,38 +372,47 @@ def build(require_2027=False):
 
     # Totales derivados del grano (floats serializados) vs. directos (Decimal exacto).
     yi = {y: i for i, y in enumerate(years)}
+    col = {d: i + 1 for i, d in enumerate(GRAIN_DIMS)}
+    # Sumas exactas de los valores serializados (Decimal de cada float), para que el
+    # control mida el error de los datos publicados y no el de la suma en punto flotante.
+    Z = lambda: [Decimal(0), Decimal(0)]
+    g_tot = defaultdict(Z)
+    g_dim = {d: defaultdict(Z) for d in GRAIN_DIMS}
+    for r in rows:
+        n, re_ = Decimal(r[NOM]), Decimal(r[REAL])
+        g_tot[r[0]][0] += n; g_tot[r[0]][1] += re_
+        for d in GRAIN_DIMS:
+            g_dim[d][(r[0], r[col[d]])][0] += n; g_dim[d][(r[0], r[col[d]])][1] += re_
     worst = 0.0
-    def g_sum(filter_fn, col):
-        return sum(r[col] for r in rows if filter_fn(r))
     for y in years:
-        tot_nom = g_sum(lambda r: r[0] == yi[y], 4)
-        worst = max(worst, abs(tot_nom - float(direct["total"][y])))
-        tot_real = g_sum(lambda r: r[0] == yi[y], 5)
-        worst = max(worst, abs(tot_real - float(direct["total"][y] * (1 if y == PRICE_BASE else factors[y]))))
-        for d, c in (("jur", 1), ("fun", 2), ("inc", 3)):
-            s_nom = s_real = 0.0
+        f = 1 if y == PRICE_BASE else factors[y]
+        worst = max(worst, float(abs(g_tot[yi[y]][0] - direct["total"][y])),
+                    float(abs(g_tot[yi[y]][1] - direct["total"][y] * f)))
+        for d in GRAIN_DIMS:
+            s_nom = s_real = Decimal(0)
             for k, i in idx[d].items():
-                v = g_sum(lambda r: r[0] == yi[y] and r[c] == i, 4)
-                s_nom += v
-                s_real += g_sum(lambda r: r[0] == yi[y] and r[c] == i, 5)
-                worst = max(worst, abs(v - float(direct[d].get((y, k), 0))))
-            worst = max(worst, abs(s_nom - tot_nom), abs(s_real - tot_real))
-    check("Suma de jurisdicciones, funciones e incisos = total general (nominal y real)", worst <= TOL,
+                v = g_dim[d].get((yi[y], i), Z())
+                s_nom += v[0]; s_real += v[1]
+                worst = max(worst, float(abs(v[0] - direct[d].get((y, k), 0))),
+                            float(abs(v[1] - direct[d].get((y, k), 0) * f)))
+            worst = max(worst, float(abs(s_nom - g_tot[yi[y]][0])), float(abs(s_real - g_tot[yi[y]][1])))
+    check("Suma de jurisdicciones, funciones, incisos y comunas = total general (nominal y real)", worst <= TOL,
           f"diferencia máxima {worst:.6f} (tolerancia {TOL})")
 
     # Cruces: subtotales = totales simples.
     worst_x = 0.0
-    for y in years:
-        for (a, ca), (b, cb) in ((("jur", 1), ("inc", 3)), (("fun", 2), ("inc", 3)), (("jur", 1), ("fun", 2))):
-            cross = defaultdict(float)
-            for r in rows:
-                if r[0] == yi[y]:
-                    cross[(r[ca], r[cb])] += r[4]
+    for a, b in (("jur", "inc"), ("fun", "inc"), ("jur", "fun"), ("geo", "jur")):
+        cross = defaultdict(float)
+        for r in rows:
+            cross[(r[0], r[col[a]], r[col[b]])] += r[NOM]
+        sub = defaultdict(float)
+        for (yy, x, _), v in cross.items():
+            sub[(yy, x)] += v
+        for y in years:
             for k, i in idx[a].items():
-                sub = sum(v for (x, _), v in cross.items() if x == i)
-                worst_x = max(worst_x, abs(sub - float(direct[a].get((y, k), 0))))
+                worst_x = max(worst_x, abs(sub.get((yi[y], i), 0) - float(direct[a].get((y, k), 0))))
     check("Cada cruce reconcilia con sus totales simples", worst_x <= TOL,
-          f"diferencia máxima {worst_x:.6f} (tolerancia {TOL}); cruces: Jurisdicción×Inciso, Función×Inciso, Jurisdicción×Función")
+          f"diferencia máxima {worst_x:.6f} (tolerancia {TOL}); cruces: Jurisdicción×Inciso, Función×Inciso, Jurisdicción×Función, Comuna×Jurisdicción")
 
     for y in years:
         check(f"Total nominal {y}: fuente = JSON", abs(float(direct['total'][y]) - float(provenance[y]['total_nominal'])) <= TOL,
@@ -414,6 +424,7 @@ def build(require_2027=False):
             print(f"  ✗ {c['control']}: {c['detalle']}", file=sys.stderr)
         raise BuildError("Fallaron validaciones críticas.")
 
+    # Años sugeridos al abrir la página; el usuario puede elegir cualquier par.
     compared_year = COMPARED_YEAR_SPEC if not missing_2027 else max(vig)
     default_base = DEFAULT_BASE_YEAR_SPEC if not missing_2027 else max(y for y in years if y < compared_year)
 
@@ -423,7 +434,7 @@ def build(require_2027=False):
             "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "price_base": PRICE_BASE,
             "compared_year_spec": COMPARED_YEAR_SPEC,
-            "compared_year": compared_year,
+            "default_compared_year": compared_year,
             "default_base_year": default_base,
             "proyecto_2027_disponible": not missing_2027,
             "ipc_average": {str(y): float(v) for y, v in IPC_PROMEDIO.items()},
@@ -434,7 +445,7 @@ def build(require_2027=False):
             "validation_summary": {"ok": True, "controles": checks, "advertencias": warnings},
             "review": {"etiquetas": review, "presencia_parcial": presence_report(records, chosen),
                        "equivalencias_aplicadas": EQUIVALENCIAS},
-            "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "monto_nominal", "monto_real_2027"],
+            "row_format": ["periodo_idx", "jur_idx", "fun_idx", "inc_idx", "geo_idx", "monto_nominal", "monto_real_2027"],
         },
         "dimensions": {
             "periodos": years,
@@ -442,6 +453,7 @@ def build(require_2027=False):
             "funciones": [{"id": k, "label": chosen["fun"][k], "fin_id": fin_of_fun.get(k),
                            "fin_label": chosen["fin"].get(fin_of_fun.get(k))} for k in dims["fun"]],
             "incisos": [{"id": k, "label": chosen["inc"][k]} for k in dims["inc"]],
+            "ubicaciones": [{"id": k, "label": chosen["geo"][k]} for k in dims["geo"]],
         },
         "rows": rows,
     }

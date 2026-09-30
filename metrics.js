@@ -8,8 +8,8 @@
 
   /** Decodifica presupuesto.json (schema_version 2) a objetos legibles. */
   function decode(json) {
-    if (!json || !json.meta || json.meta.schema_version !== 2) {
-      throw new Error('presupuesto.json no tiene schema_version 2.');
+    if (!json || !json.meta || json.meta.schema_version !== 3) {
+      throw new Error('presupuesto.json no tiene schema_version 3.');
     }
     const d = json.dimensions;
     const years = d.periodos;
@@ -18,23 +18,25 @@
       jur: d.jurisdicciones[r[1]].id,
       fun: d.funciones[r[2]].id,
       inc: d.incisos[r[3]].id,
-      nominal: r[4],
-      real: r[5],
+      geo: d.ubicaciones[r[4]].id,
+      nominal: r[5],
+      real: r[6],
     }));
     const label = {
       jur: Object.fromEntries(d.jurisdicciones.map(x => [x.id, x.label])),
       fun: Object.fromEntries(d.funciones.map(x => [x.id, x.label])),
       inc: Object.fromEntries(d.incisos.map(x => [x.id, x.label])),
+      geo: Object.fromEntries(d.ubicaciones.map(x => [x.id, x.label])),
     };
     const typeOf = Object.fromEntries(json.meta.periods.map(p => [p.periodo, p.tipo_presupuesto]));
     return { meta: json.meta, dims: d, years, rows, label, typeOf };
   }
 
-  /** Mismo recorte para ambos años: filtros {jur, fun, inc} ('' = todas). */
+  /** Mismo recorte para todos los años: filtros {jur, fun, inc, geo} ('' = todas). */
   function applyFilters(rows, filters) {
     const f = filters || {};
     return rows.filter(r =>
-      (!f.jur || r.jur === f.jur) && (!f.fun || r.fun === f.fun) && (!f.inc || r.inc === f.inc));
+      (!f.jur || r.jur === f.jur) && (!f.fun || r.fun === f.fun) && (!f.inc || r.inc === f.inc) && (!f.geo || r.geo === f.geo));
   }
 
   /** Clave de agrupación. dims: ['jur'] | ['jur','inc'] | ... */
@@ -117,6 +119,39 @@
     return { up: up.slice(0, n), down: down.slice(0, n), nuevas, eliminadas, upCount: up.length, downCount: down.length };
   }
 
-  const M = { decode, applyFilters, keyOf, totalsOf, estadoOf, pctChange, compare, rankings };
+  /**
+   * Evolución de todos los años. dims = [] da el total.
+   * Para cada categoría: montos por año y variaciones interanuales y acumuladas
+   * (desde el primer año con asignación), en nominal y en real.
+   */
+  function evolution(rows, years, dims) {
+    const acc = new Map();
+    for (const r of rows) {
+      const k = dims.length ? keyOf(r, dims) : 'total';
+      let v = acc.get(k);
+      if (!v) { v = { key: k, parts: k.split('|'), byYear: Object.fromEntries(years.map(y => [y, { nominal: 0, real: 0 }])) }; acc.set(k, v); }
+      const b = v.byYear[r.year]; if (!b) continue;
+      b.nominal += r.nominal; b.real += r.real;
+    }
+    const items = [];
+    for (const it of acc.values()) {
+      const first = years.find(y => it.byYear[y].nominal !== 0);
+      if (first === undefined) continue;                 // sin movimiento en todo el período
+      it.firstYear = first;
+      it.lastYear = years[years.length - 1];
+      for (const mode of ['nominal', 'real']) {
+        it[mode] = {
+          yoy: years.slice(1).map((y, i) => pctChange(it.byYear[years[i]][mode], it.byYear[y][mode])),
+          cum: Object.fromEntries(years.map(y => [y, years.indexOf(y) < years.indexOf(first) ? null
+            : pctChange(it.byYear[first][mode], it.byYear[y][mode])])),
+          total: pctChange(it.byYear[first][mode], it.byYear[it.lastYear][mode]),
+        };
+      }
+      items.push(it);
+    }
+    return items;
+  }
+
+  const M = { decode, evolution, applyFilters, keyOf, totalsOf, estadoOf, pctChange, compare, rankings };
   if (typeof module !== 'undefined' && module.exports) module.exports = M; else root.Metrics = M;
 })(typeof self !== 'undefined' ? self : this);

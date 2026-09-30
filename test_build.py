@@ -72,7 +72,12 @@ class TestBuildCompleto(unittest.TestCase):
         years = self.out["dimensions"]["periodos"]
         for r in self.out["rows"]:
             y = years[r[0]]
-            self.assertAlmostEqual(r[5], r[4] * float(Decimal("3020.12") / B.IPC_PROMEDIO[y]), delta=max(0.01, abs(r[4]) * 1e-12))
+            self.assertAlmostEqual(r[6], r[5] * float(Decimal("3020.12") / B.IPC_PROMEDIO[y]), delta=max(0.01, abs(r[5]) * 1e-12))
+
+    def test_ubicaciones(self):
+        labels = [g["label"] for g in self.out["dimensions"]["ubicaciones"]]
+        self.assertIn("Comuna 1", labels)
+        self.assertEqual(self.out["meta"]["row_format"][4], "geo_idx")
 
     def test_funcion_clave_compuesta(self):
         ids = [f["id"] for f in self.out["dimensions"]["funciones"]]

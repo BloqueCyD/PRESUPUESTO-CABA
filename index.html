@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Comparación presupuestaria · Presupuesto CABA</title>
-<meta name="description" content="Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años, en pesos corrientes y a precios de 2027, por jurisdicción, función e inciso.">
+<title>Presupuesto CABA · Comparación presupuestaria</title>
+<meta name="description" content="Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años: montos nominales y variaciones reales o nominales por jurisdicción, función, inciso y comuna.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -15,223 +15,242 @@
 <header class="site-header">
   <div class="wrap header-row">
     <div>
-      <p class="kicker">Ciudad Autónoma de Buenos Aires — Comparación presupuestaria</p>
+      <p class="kicker">Ciudad Autónoma de Buenos Aires — Presupuesto</p>
       <h1 id="page-title">Comparación presupuestaria</h1>
-      <p class="subtitle" id="type-note">2023–2026 corresponden al presupuesto Vigente. 2027 corresponde al Proyecto de Presupuesto.</p>
+      <p class="subtitle">Los montos se muestran siempre en pesos corrientes de cada año (nominales), como figuran en las partidas. Las variaciones se pueden ver en términos reales, a precios de 2027, o nominales.</p>
     </div>
     <div class="header-meta">
-      <span class="badge" id="mode-badge">Real, a precios de 2027</span>
-      <span class="source-note">Fuente: presupuesto Vigente de la Ciudad de Buenos Aires, 2023–2026</span>
+      <span class="badge" id="mode-badge">Variaciones reales</span>
+      <span class="source-note">2023–2026: presupuesto Vigente. 2027: Proyecto de Presupuesto.</span>
     </div>
   </div>
 </header>
 
 <div class="pending" id="pending-note" hidden>
-  <div class="wrap">
-    <p><strong>El Proyecto de Presupuesto 2027 todavía no está cargado.</strong>
-      Mientras tanto, la vista compara contra el último Vigente disponible (<span class="js-comp-year">2026</span>, <span class="js-comp-version">T2</span>).
-      Todos los montos reales ya están a precios de 2027. Cuando se cargue el Proyecto, 2027 pasa a ser el año comparado.</p>
-  </div>
+  <div class="wrap"><p><strong>El Proyecto de Presupuesto 2027 todavía no está cargado.</strong> Por ahora podés comparar cualquier par de años entre <span class="js-first-year">2023</span> y <span class="js-last-year">2026</span>.</p></div>
 </div>
 
-<section class="controls" aria-label="Controles de la comparación">
+<section class="controls" aria-label="Controles">
   <div class="wrap controls-row">
-    <label class="field inline">
-      <span>Año base</span>
-      <select id="base-year"></select>
-    </label>
+    <fieldset class="years" id="years-box">
+      <legend>Comparar</legend>
+      <label class="year-pick a">
+        <span>Año A</span>
+        <select id="year-a" aria-label="Año A (punto de partida)"></select>
+      </label>
+      <span class="arrow-sep" aria-hidden="true">→</span>
+      <label class="year-pick b">
+        <span>Año B</span>
+        <select id="year-b" aria-label="Año B (punto de llegada)"></select>
+      </label>
+      <p class="years-note" id="years-note">La variación va de A a B.</p>
+    </fieldset>
     <div class="field inline">
-      <span id="mode-label">Valores</span>
+      <span id="mode-label">Variaciones</span>
       <div class="seg" role="radiogroup" aria-labelledby="mode-label" id="mode-seg">
-        <button type="button" role="radio" data-mode="real" aria-checked="true">Real</button>
-        <button type="button" role="radio" data-mode="nominal" aria-checked="false">Nominal</button>
+        <button type="button" role="radio" data-mode="real" aria-checked="true">Reales</button>
+        <button type="button" role="radio" data-mode="nominal" aria-checked="false">Nominales</button>
       </div>
     </div>
-    <label class="field inline grow">
-      <span>Jurisdicción</span>
-      <select id="f-jur"></select>
-    </label>
-    <label class="field inline grow">
-      <span>Función</span>
-      <select id="f-fun"></select>
-    </label>
-    <label class="field inline grow">
-      <span>Inciso</span>
-      <select id="f-inc"></select>
-    </label>
+    <label class="field inline grow"><span>Jurisdicción</span><select id="f-jur"></select></label>
+    <label class="field inline grow"><span>Función</span><select id="f-fun"></select></label>
+    <label class="field inline grow"><span>Inciso</span><select id="f-inc"></select></label>
+    <label class="field inline grow"><span>Comuna o ubicación</span><select id="f-geo"></select></label>
     <button type="button" class="link-btn" id="clear-filters">Limpiar filtros</button>
   </div>
 </section>
 
+<nav class="wrap main-tabs" role="tablist" aria-label="Secciones" id="main-tabs">
+  <button type="button" role="tab" id="tab-comparacion" aria-controls="panel-comparacion" data-tab="comparacion" aria-selected="true">Comparación entre dos años</button>
+  <button type="button" role="tab" id="tab-evolucion" aria-controls="panel-evolucion" data-tab="evolucion" aria-selected="false">Evolución <span class="js-range">2023–2026</span></button>
+  <button type="button" role="tab" id="tab-comunas" aria-controls="panel-comunas" data-tab="comunas" aria-selected="false">Comunas</button>
+</nav>
+
 <div id="status" class="status wrap" role="status" aria-live="polite">Cargando datos…</div>
 
 <div id="app" hidden>
-  <section class="kpis" aria-label="Grandes números">
-    <div class="wrap">
-      <div class="kpi-grid" id="kpi-grid"></div>
-      <p class="synthesis" id="synthesis"></p>
-      <p class="filter-line" id="filter-line" hidden></p>
+
+  <!-- ===================== COMPARACIÓN ===================== -->
+  <section id="panel-comparacion" role="tabpanel" aria-labelledby="tab-comparacion">
+    <div class="kpis">
+      <div class="wrap">
+        <div class="kpi-grid" id="kpi-grid"></div>
+        <p class="synthesis" id="synthesis"></p>
+        <p class="filter-line js-filter-line" hidden></p>
+      </div>
     </div>
+
+    <main class="wrap stack">
+      <section class="card" aria-labelledby="h-rank">
+        <div class="card-head">
+          <h2 id="h-rank">¿Dónde aumenta y dónde cae el presupuesto?</h2>
+          <div class="card-controls">
+            <label class="field inline"><span>Dimensión</span>
+              <select id="rank-dim"><option value="jur">Jurisdicción</option><option value="fun">Función</option><option value="inc">Inciso</option><option value="geo">Comuna o ubicación</option></select>
+            </label>
+            <label class="field inline"><span>Ordenar por</span>
+              <select id="rank-order"><option value="abs">Cambio en pesos</option><option value="pct">Cambio porcentual</option></select>
+            </label>
+          </div>
+        </div>
+        <p class="unit-line" id="rank-unit"></p>
+        <p class="warn-note" id="pct-warning" hidden>Ordenar por porcentaje destaca categorías con montos chicos, donde un cambio pequeño en pesos produce un porcentaje grande. Mirá la participación de cada fila antes de sacar conclusiones.</p>
+        <div class="rank-grid">
+          <div><h3 class="rank-title up">Mayores aumentos <span class="count" id="up-count"></span></h3><ol class="rank-list" id="rank-up"></ol></div>
+          <div><h3 class="rank-title down">Mayores caídas <span class="count" id="down-count"></span></h3><ol class="rank-list" id="rank-down"></ol></div>
+        </div>
+        <div class="rank-grid special">
+          <div><h3 class="rank-title new">Con asignación en <span class="js-yb"></span> y sin asignación en <span class="js-ya"></span> <span class="count" id="new-count"></span></h3><ul class="plain-list" id="rank-new"></ul></div>
+          <div><h3 class="rank-title gone">Con asignación en <span class="js-ya"></span> y sin asignación en <span class="js-yb"></span> <span class="count" id="gone-count"></span></h3><ul class="plain-list" id="rank-gone"></ul></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-comp">
+        <div class="card-head">
+          <h2 id="h-comp">Composición del gasto</h2>
+          <div class="subtabs" role="tablist" aria-label="Dimensión de la composición" id="comp-tabs">
+            <button type="button" role="tab" data-dim="jur" aria-selected="true">Jurisdicción</button>
+            <button type="button" role="tab" data-dim="fun" aria-selected="false">Función</button>
+            <button type="button" role="tab" data-dim="inc" aria-selected="false">Inciso</button>
+            <button type="button" role="tab" data-dim="geo" aria-selected="false">Comuna</button>
+          </div>
+        </div>
+        <p class="unit-line">Participación de cada categoría en el total de cada año, sobre montos nominales. El cambio se mide en puntos porcentuales (pp).</p>
+        <div class="comp-chart"><canvas id="comp-chart" role="img" aria-label="Barras apiladas al 100 % con la composición del gasto en el año A y en el año B. La tabla de abajo tiene los mismos datos."></canvas></div>
+        <div class="table-scroll comp-table-wrap"><table class="data-table" id="comp-table"></table></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-cross">
+        <div class="card-head">
+          <h2 id="h-cross">Cruces que explican el cambio</h2>
+          <div class="subtabs" role="tablist" aria-label="Cruce" id="cross-tabs">
+            <button type="button" role="tab" data-cross="jur_inc" aria-selected="true">Jurisdicción × Inciso</button>
+            <button type="button" role="tab" data-cross="fun_inc" aria-selected="false">Función × Inciso</button>
+            <button type="button" role="tab" data-cross="jur_fun" aria-selected="false">Jurisdicción × Función</button>
+          </div>
+        </div>
+        <p class="unit-line" id="cross-unit"></p>
+        <div class="cross-controls">
+          <label class="field inline grow"><span>Buscar fila</span><input type="search" id="cross-search" placeholder="ej: salud, educación, personal" autocomplete="off"></label>
+          <label class="field inline"><span>Filas</span>
+            <select id="cross-top"><option value="10">Top 10</option><option value="15" selected>Top 15</option><option value="25">Top 25</option><option value="all">Ver todas</option></select>
+          </label>
+          <label class="field inline"><span>Ordenar filas</span>
+            <select id="cross-sort"><option value="abs">Mayor cambio</option><option value="up">Mayor aumento</option><option value="down">Mayor caída</option><option value="label">Alfabético</option></select>
+          </label>
+        </div>
+        <div class="legend" id="cross-legend"></div>
+        <div class="cross-layout">
+          <div class="matrix-wrap" id="matrix-wrap"></div>
+          <aside class="cell-detail" id="cell-detail" aria-live="polite"></aside>
+        </div>
+        <div class="matrix-mobile" id="matrix-mobile"></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-table">
+        <div class="card-head">
+          <h2 id="h-table">Tabla completa</h2>
+          <button type="button" class="btn" id="export-csv">Descargar CSV</button>
+        </div>
+        <div class="cross-controls">
+          <label class="field inline"><span>Agrupar por</span>
+            <select id="table-dim">
+              <option value="jur">Jurisdicción</option><option value="fun">Función</option><option value="inc">Inciso</option><option value="geo">Comuna o ubicación</option>
+              <option value="jur_inc">Jurisdicción × Inciso</option><option value="fun_inc">Función × Inciso</option><option value="jur_fun">Jurisdicción × Función</option><option value="geo_jur">Comuna × Jurisdicción</option>
+            </select>
+          </label>
+          <label class="field inline grow"><span>Buscar</span><input type="search" id="table-search" placeholder="Filtrar filas por nombre" autocomplete="off"></label>
+          <label class="field inline"><span>Mostrar</span>
+            <select id="table-top"><option value="25">25 filas</option><option value="50">50 filas</option><option value="all" selected>Todas</option></select>
+          </label>
+          <label class="check"><input type="checkbox" id="table-zero"> Incluir sin movimiento</label>
+        </div>
+        <p class="unit-line" id="table-unit"></p>
+        <div class="table-scroll table-tall"><table class="data-table" id="full-table"></table></div>
+      </section>
+    </main>
   </section>
 
-  <main class="wrap stack">
-
-    <section class="card" aria-labelledby="h-rank">
-      <div class="card-head">
-        <h2 id="h-rank">¿Dónde aumenta y dónde cae el presupuesto?</h2>
-        <div class="card-controls">
-          <label class="field inline">
-            <span>Dimensión</span>
-            <select id="rank-dim">
-              <option value="jur">Jurisdicción</option>
-              <option value="fun">Función</option>
-              <option value="inc">Inciso</option>
-            </select>
-          </label>
-          <label class="field inline">
-            <span>Ordenar por</span>
-            <select id="rank-order">
-              <option value="abs">Cambio absoluto</option>
-              <option value="pct">Cambio porcentual</option>
-            </select>
+  <!-- ===================== EVOLUCIÓN ===================== -->
+  <section id="panel-evolucion" role="tabpanel" aria-labelledby="tab-evolucion" hidden>
+    <main class="wrap stack">
+      <section class="card" aria-labelledby="h-evo">
+        <div class="card-head">
+          <h2 id="h-evo">Evolución <span class="js-range">2023–2026</span></h2>
+          <label class="field inline"><span>Ver</span>
+            <select id="evo-dim"><option value="total">Total</option><option value="jur">Por jurisdicción</option><option value="fun">Por función</option><option value="inc">Por inciso</option><option value="geo">Por comuna o ubicación</option></select>
           </label>
         </div>
-      </div>
-      <p class="unit-line js-unit"></p>
-      <p class="warn-note" id="pct-warning" hidden>Ordenar por porcentaje destaca categorías con bases chicas, donde un cambio pequeño en pesos produce un porcentaje grande. Mirá la participación de cada fila antes de sacar conclusiones.</p>
-      <div class="rank-grid">
-        <div>
-          <h3 class="rank-title up">Mayores aumentos <span class="count" id="up-count"></span></h3>
-          <ol class="rank-list" id="rank-up"></ol>
+        <p class="unit-line" id="evo-intro"></p>
+        <p class="filter-line js-filter-line" hidden></p>
+        <div class="evo-charts">
+          <figure class="evo-fig">
+            <figcaption>Presupuesto nominal por año <span class="muted">(pesos corrientes de cada año)</span></figcaption>
+            <div class="evo-chart"><canvas id="evo-nominal" role="img" aria-label="Montos nominales por año. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
+          <figure class="evo-fig">
+            <figcaption id="evo-var-title">Variación real acumulada</figcaption>
+            <div class="evo-chart"><canvas id="evo-var" role="img" aria-label="Variación acumulada respecto del primer año con asignación. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
         </div>
-        <div>
-          <h3 class="rank-title down">Mayores caídas <span class="count" id="down-count"></span></h3>
-          <ol class="rank-list" id="rank-down"></ol>
-        </div>
-      </div>
-      <div class="rank-grid special">
-        <div>
-          <h3 class="rank-title new">Nuevas en <span class="js-comp-year"></span> <span class="count" id="new-count"></span></h3>
-          <ul class="plain-list" id="rank-new"></ul>
-        </div>
-        <div>
-          <h3 class="rank-title gone">Sin asignación en <span class="js-comp-year"></span> <span class="count" id="gone-count"></span></h3>
-          <ul class="plain-list" id="rank-gone"></ul>
-        </div>
-      </div>
-    </section>
+        <p class="unit-line" id="evo-pick-note"></p>
+        <div class="table-scroll table-tall"><table class="data-table" id="evo-table"></table></div>
+      </section>
+    </main>
+  </section>
 
-    <section class="card" aria-labelledby="h-comp">
-      <div class="card-head">
-        <h2 id="h-comp">Composición del gasto</h2>
-        <div class="subtabs" role="tablist" aria-label="Dimensión de la composición" id="comp-tabs">
-          <button type="button" role="tab" data-dim="jur" aria-selected="true">Jurisdicción</button>
-          <button type="button" role="tab" data-dim="fun" aria-selected="false">Función</button>
-          <button type="button" role="tab" data-dim="inc" aria-selected="false">Inciso</button>
+  <!-- ===================== COMUNAS ===================== -->
+  <section id="panel-comunas" role="tabpanel" aria-labelledby="tab-comunas" hidden>
+    <main class="wrap stack">
+      <section class="card" aria-labelledby="h-com">
+        <div class="card-head">
+          <h2 id="h-com">Presupuesto por comuna</h2>
+          <button type="button" class="link-btn" id="to-evo-geo">Ver la evolución por comuna</button>
         </div>
-      </div>
-      <p class="unit-line">Participación de cada categoría en el total del recorte de cada año. El cambio se mide en puntos porcentuales (pp). Dentro de un mismo año la participación es igual en real y en nominal, porque todo el año se ajusta por el mismo factor.</p>
-      <div class="comp-chart"><canvas id="comp-chart" role="img" aria-label="Barras apiladas al 100 % de la composición del gasto en el año base y el comparado. La tabla de al lado tiene los mismos datos."></canvas></div>
-      <div class="table-scroll comp-table-wrap">
-        <table class="data-table" id="comp-table"></table>
-      </div>
-    </section>
-
-    <section class="card" aria-labelledby="h-cross">
-      <div class="card-head">
-        <h2 id="h-cross">Cruces que explican el cambio</h2>
-        <div class="subtabs" role="tablist" aria-label="Cruce" id="cross-tabs">
-          <button type="button" role="tab" data-cross="jur_inc" aria-selected="true">Jurisdicción × Inciso</button>
-          <button type="button" role="tab" data-cross="fun_inc" aria-selected="false">Función × Inciso</button>
-          <button type="button" role="tab" data-cross="jur_fun" aria-selected="false">Jurisdicción × Función</button>
+        <p class="unit-line">Cada partida del presupuesto registra una ubicación geográfica. Acá se suman los montos según esa ubicación.</p>
+        <p class="filter-line js-filter-line" hidden></p>
+        <div class="com-summary" id="com-summary"></div>
+        <div class="com-charts">
+          <figure class="evo-fig">
+            <figcaption>Monto nominal por comuna <span class="muted">(pesos corrientes de cada año)</span></figcaption>
+            <div class="com-chart"><canvas id="com-amounts" role="img" aria-label="Montos nominales por comuna en el año A y el año B. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
+          <figure class="evo-fig">
+            <figcaption id="com-var-title">Variación por comuna</figcaption>
+            <div class="com-chart"><canvas id="com-var" role="img" aria-label="Variación porcentual de cada comuna entre el año A y el año B. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
         </div>
-      </div>
-      <p class="unit-line" id="cross-unit"></p>
-      <div class="cross-controls">
-        <label class="field inline grow">
-          <span>Buscar fila</span>
-          <input type="search" id="cross-search" placeholder="ej: salud, educación, personal" autocomplete="off">
-        </label>
-        <label class="field inline">
-          <span>Filas</span>
-          <select id="cross-top">
-            <option value="10">Top 10</option>
-            <option value="15" selected>Top 15</option>
-            <option value="25">Top 25</option>
-            <option value="all">Ver todas</option>
-          </select>
-        </label>
-        <label class="field inline">
-          <span>Ordenar filas</span>
-          <select id="cross-sort">
-            <option value="abs">Mayor cambio (absoluto)</option>
-            <option value="up">Mayor aumento</option>
-            <option value="down">Mayor caída</option>
-            <option value="label">Alfabético</option>
-          </select>
-        </label>
-      </div>
-      <div class="legend" id="cross-legend"></div>
-      <div class="cross-layout">
-        <div class="matrix-wrap" id="matrix-wrap"></div>
-        <aside class="cell-detail" id="cell-detail" aria-live="polite">
-          <p class="muted">Elegí una celda para ver el detalle: base, comparado, cambio y contribución al cambio total.</p>
-        </aside>
-      </div>
-      <div class="matrix-mobile" id="matrix-mobile"></div>
-    </section>
+        <h3 class="sub-h">Detalle por comuna <span class="muted" style="font-weight:400;font-size:14px">(elegí una fila para ver qué la explica)</span></h3>
+        <div class="table-scroll"><table class="data-table selectable" id="com-table"></table></div>
+      </section>
 
-    <section class="card" aria-labelledby="h-table">
-      <div class="card-head">
-        <h2 id="h-table">Tabla completa</h2>
-        <button type="button" class="btn" id="export-csv">Descargar CSV</button>
-      </div>
-      <div class="cross-controls">
-        <label class="field inline">
-          <span>Agrupar por</span>
-          <select id="table-dim">
-            <option value="jur">Jurisdicción</option>
-            <option value="fun">Función</option>
-            <option value="inc">Inciso</option>
-            <option value="jur_inc">Jurisdicción × Inciso</option>
-            <option value="fun_inc">Función × Inciso</option>
-            <option value="jur_fun">Jurisdicción × Función</option>
-          </select>
-        </label>
-        <label class="field inline grow">
-          <span>Buscar</span>
-          <input type="search" id="table-search" placeholder="Filtrar filas por nombre" autocomplete="off">
-        </label>
-        <label class="field inline">
-          <span>Mostrar</span>
-          <select id="table-top">
-            <option value="25">25 filas</option>
-            <option value="50">50 filas</option>
-            <option value="all" selected>Todas</option>
-          </select>
-        </label>
-        <label class="check">
-          <input type="checkbox" id="table-zero"> Incluir sin movimiento
-        </label>
-      </div>
-      <p class="unit-line" id="table-unit"></p>
-      <div class="table-scroll table-tall">
-        <table class="data-table" id="full-table"></table>
-      </div>
-    </section>
+      <section class="card" aria-labelledby="h-com-det">
+        <div class="card-head">
+          <h2 id="h-com-det">¿Qué explica el presupuesto de la comuna?</h2>
+          <div class="card-controls">
+            <label class="field inline"><span>Comuna o ubicación</span><select id="com-sel"></select></label>
+            <div class="subtabs" role="tablist" aria-label="Desglose" id="com-det-tabs">
+              <button type="button" role="tab" data-dim="jur" aria-selected="true">Jurisdicción</button>
+              <button type="button" role="tab" data-dim="fun" aria-selected="false">Función</button>
+              <button type="button" role="tab" data-dim="inc" aria-selected="false">Inciso</button>
+            </div>
+          </div>
+        </div>
+        <p class="unit-line" id="com-det-unit"></p>
+        <div class="table-scroll"><table class="data-table" id="com-det-table"></table></div>
+      </section>
 
-    <section class="card method" aria-labelledby="h-method" id="metodologia">
-      <h2 id="h-method">Metodología y fuentes</h2>
-      <div id="method-body"></div>
-    </section>
-
-  </main>
+      <section class="card" aria-labelledby="h-com-other">
+        <h2 id="h-com-other">Otras ubicaciones registradas</h2>
+        <p class="unit-line">Ubicaciones geográficas del presupuesto que no llevan el nombre de una comuna.</p>
+        <div class="table-scroll"><table class="data-table" id="com-other"></table></div>
+      </section>
+    </main>
+  </section>
 </div>
 
 <footer class="site-footer">
-  <div class="wrap">
-    <p>Sitio estático. Los datos se generan con <code>build_data.py</code> a partir de las fuentes declaradas en la sección de metodología; el navegador no recalcula inflación.</p>
-  </div>
+  <div class="wrap"><p>Fuente: presupuesto Vigente de la Ciudad de Buenos Aires. Variaciones reales calculadas a precios de 2027 con el IPC promedio de cada año.</p></div>
 </footer>
 
 <script src="chart.umd.min.js"></script>
