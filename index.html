@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comparación presupuestaria · Presupuesto CABA</title>
+<meta name="description" content="Comparación del presupuesto Vigente de la Ciudad de Buenos Aires entre años, en pesos corrientes y a precios de 2027, por jurisdicción, función e inciso.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <div>
+      <p class="kicker">Ciudad Autónoma de Buenos Aires — Comparación presupuestaria</p>
+      <h1 id="page-title">Comparación presupuestaria</h1>
+      <p class="subtitle" id="type-note">2023–2026 corresponden al presupuesto Vigente. 2027 corresponde al Proyecto de Presupuesto.</p>
+    </div>
+    <div class="header-meta">
+      <span class="badge" id="mode-badge">Real, a precios de 2027</span>
+      <span class="source-note">Fuente: presupuesto Vigente de la Ciudad de Buenos Aires, 2023–2026</span>
+    </div>
+  </div>
+</header>
+
+<div class="pending" id="pending-note" hidden>
+  <div class="wrap">
+    <p><strong>El Proyecto de Presupuesto 2027 todavía no está cargado.</strong>
+      Mientras tanto, la vista compara contra el último Vigente disponible (<span class="js-comp-year">2026</span>, <span class="js-comp-version">T2</span>).
+      Todos los montos reales ya están a precios de 2027. Cuando se cargue el Proyecto, 2027 pasa a ser el año comparado.</p>
+  </div>
+</div>
+
+<section class="controls" aria-label="Controles de la comparación">
+  <div class="wrap controls-row">
+    <label class="field inline">
+      <span>Año base</span>
+      <select id="base-year"></select>
+    </label>
+    <div class="field inline">
+      <span id="mode-label">Valores</span>
+      <div class="seg" role="radiogroup" aria-labelledby="mode-label" id="mode-seg">
+        <button type="button" role="radio" data-mode="real" aria-checked="true">Real</button>
+        <button type="button" role="radio" data-mode="nominal" aria-checked="false">Nominal</button>
+      </div>
+    </div>
+    <label class="field inline grow">
+      <span>Jurisdicción</span>
+      <select id="f-jur"></select>
+    </label>
+    <label class="field inline grow">
+      <span>Función</span>
+      <select id="f-fun"></select>
+    </label>
+    <label class="field inline grow">
+      <span>Inciso</span>
+      <select id="f-inc"></select>
+    </label>
+    <button type="button" class="link-btn" id="clear-filters">Limpiar filtros</button>
+  </div>
+</section>
+
+<div id="status" class="status wrap" role="status" aria-live="polite">Cargando datos…</div>
+
+<div id="app" hidden>
+  <section class="kpis" aria-label="Grandes números">
+    <div class="wrap">
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <p class="synthesis" id="synthesis"></p>
+      <p class="filter-line" id="filter-line" hidden></p>
+    </div>
+  </section>
+
+  <main class="wrap stack">
+
+    <section class="card" aria-labelledby="h-rank">
+      <div class="card-head">
+        <h2 id="h-rank">¿Dónde aumenta y dónde cae el presupuesto?</h2>
+        <div class="card-controls">
+          <label class="field inline">
+            <span>Dimensión</span>
+            <select id="rank-dim">
+              <option value="jur">Jurisdicción</option>
+              <option value="fun">Función</option>
+              <option value="inc">Inciso</option>
+            </select>
+          </label>
+          <label class="field inline">
+            <span>Ordenar por</span>
+            <select id="rank-order">
+              <option value="abs">Cambio absoluto</option>
+              <option value="pct">Cambio porcentual</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <p class="unit-line js-unit"></p>
+      <p class="warn-note" id="pct-warning" hidden>Ordenar por porcentaje destaca categorías con bases chicas, donde un cambio pequeño en pesos produce un porcentaje grande. Mirá la participación de cada fila antes de sacar conclusiones.</p>
+      <div class="rank-grid">
+        <div>
+          <h3 class="rank-title up">Mayores aumentos <span class="count" id="up-count"></span></h3>
+          <ol class="rank-list" id="rank-up"></ol>
+        </div>
+        <div>
+          <h3 class="rank-title down">Mayores caídas <span class="count" id="down-count"></span></h3>
+          <ol class="rank-list" id="rank-down"></ol>
+        </div>
+      </div>
+      <div class="rank-grid special">
+        <div>
+          <h3 class="rank-title new">Nuevas en <span class="js-comp-year"></span> <span class="count" id="new-count"></span></h3>
+          <ul class="plain-list" id="rank-new"></ul>
+        </div>
+        <div>
+          <h3 class="rank-title gone">Sin asignación en <span class="js-comp-year"></span> <span class="count" id="gone-count"></span></h3>
+          <ul class="plain-list" id="rank-gone"></ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-comp">
+      <div class="card-head">
+        <h2 id="h-comp">Composición del gasto</h2>
+        <div class="subtabs" role="tablist" aria-label="Dimensión de la composición" id="comp-tabs">
+          <button type="button" role="tab" data-dim="jur" aria-selected="true">Jurisdicción</button>
+          <button type="button" role="tab" data-dim="fun" aria-selected="false">Función</button>
+          <button type="button" role="tab" data-dim="inc" aria-selected="false">Inciso</button>
+        </div>
+      </div>
+      <p class="unit-line">Participación de cada categoría en el total del recorte de cada año. El cambio se mide en puntos porcentuales (pp). Dentro de un mismo año la participación es igual en real y en nominal, porque todo el año se ajusta por el mismo factor.</p>
+      <div class="comp-chart"><canvas id="comp-chart" role="img" aria-label="Barras apiladas al 100 % de la composición del gasto en el año base y el comparado. La tabla de al lado tiene los mismos datos."></canvas></div>
+      <div class="table-scroll comp-table-wrap">
+        <table class="data-table" id="comp-table"></table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-cross">
+      <div class="card-head">
+        <h2 id="h-cross">Cruces que explican el cambio</h2>
+        <div class="subtabs" role="tablist" aria-label="Cruce" id="cross-tabs">
+          <button type="button" role="tab" data-cross="jur_inc" aria-selected="true">Jurisdicción × Inciso</button>
+          <button type="button" role="tab" data-cross="fun_inc" aria-selected="false">Función × Inciso</button>
+          <button type="button" role="tab" data-cross="jur_fun" aria-selected="false">Jurisdicción × Función</button>
+        </div>
+      </div>
+      <p class="unit-line" id="cross-unit"></p>
+      <div class="cross-controls">
+        <label class="field inline grow">
+          <span>Buscar fila</span>
+          <input type="search" id="cross-search" placeholder="ej: salud, educación, personal" autocomplete="off">
+        </label>
+        <label class="field inline">
+          <span>Filas</span>
+          <select id="cross-top">
+            <option value="10">Top 10</option>
+            <option value="15" selected>Top 15</option>
+            <option value="25">Top 25</option>
+            <option value="all">Ver todas</option>
+          </select>
+        </label>
+        <label class="field inline">
+          <span>Ordenar filas</span>
+          <select id="cross-sort">
+            <option value="abs">Mayor cambio (absoluto)</option>
+            <option value="up">Mayor aumento</option>
+            <option value="down">Mayor caída</option>
+            <option value="label">Alfabético</option>
+          </select>
+        </label>
+      </div>
+      <div class="legend" id="cross-legend"></div>
+      <div class="cross-layout">
+        <div class="matrix-wrap" id="matrix-wrap"></div>
+        <aside class="cell-detail" id="cell-detail" aria-live="polite">
+          <p class="muted">Elegí una celda para ver el detalle: base, comparado, cambio y contribución al cambio total.</p>
+        </aside>
+      </div>
+      <div class="matrix-mobile" id="matrix-mobile"></div>
+    </section>
+
+    <section class="card" aria-labelledby="h-table">
+      <div class="card-head">
+        <h2 id="h-table">Tabla completa</h2>
+        <button type="button" class="btn" id="export-csv">Descargar CSV</button>
+      </div>
+      <div class="cross-controls">
+        <label class="field inline">
+          <span>Agrupar por</span>
+          <select id="table-dim">
+            <option value="jur">Jurisdicción</option>
+            <option value="fun">Función</option>
+            <option value="inc">Inciso</option>
+            <option value="jur_inc">Jurisdicción × Inciso</option>
+            <option value="fun_inc">Función × Inciso</option>
+            <option value="jur_fun">Jurisdicción × Función</option>
+          </select>
+        </label>
+        <label class="field inline grow">
+          <span>Buscar</span>
+          <input type="search" id="table-search" placeholder="Filtrar filas por nombre" autocomplete="off">
+        </label>
+        <label class="field inline">
+          <span>Mostrar</span>
+          <select id="table-top">
+            <option value="25">25 filas</option>
+            <option value="50">50 filas</option>
+            <option value="all" selected>Todas</option>
+          </select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="table-zero"> Incluir sin movimiento
+        </label>
+      </div>
+      <p class="unit-line" id="table-unit"></p>
+      <div class="table-scroll table-tall">
+        <table class="data-table" id="full-table"></table>
+      </div>
+    </section>
+
+    <section class="card method" aria-labelledby="h-method" id="metodologia">
+      <h2 id="h-method">Metodología y fuentes</h2>
+      <div id="method-body"></div>
+    </section>
+
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Sitio estático. Los datos se generan con <code>build_data.py</code> a partir de las fuentes declaradas en la sección de metodología; el navegador no recalcula inflación.</p>
+  </div>
+</footer>
+
+<script src="chart.umd.min.js"></script>
+<script src="metrics.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
