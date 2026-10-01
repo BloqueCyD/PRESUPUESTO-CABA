@@ -1,0 +1,53 @@
+/* ingresos.css — sólo la pestaña Ingresos. Reutiliza los tokens de style.css
+   y no redefine ninguna regla de las pestañas de gastos. */
+
+/* Al ver Ingresos se ocultan los controles y los avisos propios de gastos. */
+body.ver-ingresos .controls,
+body.ver-ingresos #app,
+body.ver-ingresos #status,
+body.ver-ingresos #pending-note,
+body.ver-ingresos #proyecto-note{display:none!important}
+
+#panel-ingresos .kpis{margin-top:12px;border-top:1px solid var(--line)}
+
+.ing-warning{margin:0 0 16px;padding:12px 16px 12px 14px;background:#F3E6CC;border:1px solid #D9BF8A;border-left:5px solid var(--gold-deep);
+  color:#4A3510;font-size:15px;line-height:1.45;max-width:96ch;border-radius:2px}
+.ing-warning strong{color:#3A2808}
+
+.ing-controls{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;margin:0 0 14px}
+.ing-compare{margin:0;padding-bottom:6px;display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:14px}
+.ing-compare .arrow-sep{padding-bottom:0}
+
+.ing-chart{position:relative;height:340px}
+
+#ing-table th.is-mode,#ing-table td.is-mode{background:rgba(31,92,87,.07);font-weight:600}
+#ing-table thead th.is-mode{color:var(--teal)}
+#ing-table tfoot tr.total-row td{position:static;border-top:1px solid var(--line)}
+#ing-table tfoot tr.total-row:last-child td{border-top:2px solid var(--ink);background:var(--paper-raised)}
+#ing-table td.label{max-width:none}
+
+.ing-bases{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;margin:4px 0 18px}
+.ing-base{background:#fff;border:1px solid var(--line);padding:14px 16px}
+.ing-base.a{box-shadow:inset 0 4px 0 var(--year-a)}
+.ing-base.b{box-shadow:inset 0 4px 0 var(--year-b)}
+.ing-base p{margin:0}
+.ing-base-y{font-size:17px}
+.ing-base-t{font-family:var(--serif);font-weight:600;font-size:21px;margin:6px 0 4px!important;color:var(--ink)}
+.ing-base-d{font-size:13.5px;color:var(--ink-soft)}
+
+.ing-method{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 18px;margin:0;font-size:13.5px;max-width:90ch}
+.ing-method dt{color:var(--ink-soft)}
+.ing-method dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ing-method dd.txt{font-family:var(--sans)}
+
+@media (max-width:760px){
+  .ing-bases{grid-template-columns:minmax(0,1fr)}
+  .ing-method{grid-template-columns:minmax(0,1fr)}
+  .ing-method dd{margin-bottom:6px}
+}
+
+#ing-kpis .full{word-break:normal;overflow-wrap:anywhere}
+#ing-table td.label{white-space:normal;min-width:190px}
+.ing-origen{display:block;font-size:12px;color:var(--ink-soft);font-weight:400}
+#ing-table{font-size:13px}
+#ing-table th,#ing-table td{padding:7px 8px}

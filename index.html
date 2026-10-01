@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="ingresos.css">
 </head>
 <body>
 
@@ -69,6 +70,7 @@
   <button type="button" role="tab" id="tab-comparacion" aria-controls="panel-comparacion" data-tab="comparacion" aria-selected="true">Comparación entre dos años</button>
   <button type="button" role="tab" id="tab-evolucion" aria-controls="panel-evolucion" data-tab="evolucion" aria-selected="false">Evolución <span class="js-range">2023–2026</span></button>
   <button type="button" role="tab" id="tab-comunas" aria-controls="panel-comunas" data-tab="comunas" aria-selected="false">Comunas</button>
+  <button type="button" role="tab" id="tab-ingresos" aria-controls="panel-ingresos" data-tab="ingresos" aria-selected="false">Ingresos</button>
 </nav>
 
 <div id="status" class="status wrap" role="status" aria-live="polite">Cargando datos…</div>
@@ -287,6 +289,73 @@
   </section>
 </div>
 
+<!-- ===================== INGRESOS (fuente independiente: ingresos.json) ===================== -->
+<section id="panel-ingresos" role="tabpanel" aria-labelledby="tab-ingresos" hidden>
+  <p id="ing-status" class="status wrap" role="status" aria-live="polite">Cargando ingresos…</p>
+  <div id="ing-body" hidden>
+    <div class="kpis">
+      <div class="wrap">
+        <p class="ing-warning" role="note"><strong>Advertencia metodológica.</strong> La comparación enfrenta recursos vigentes al 30/06/2026 con los recursos proyectados para 2027. No son montos de recaudación efectivamente percibida.</p>
+        <div class="ing-controls">
+          <div class="field inline">
+            <span id="ing-mode-label">Montos y variaciones</span>
+            <div class="seg" role="radiogroup" aria-labelledby="ing-mode-label" id="ing-mode-seg">
+              <button type="button" role="radio" data-mode="real" aria-checked="true">Reales</button>
+              <button type="button" role="radio" data-mode="nominal" aria-checked="false">Nominales</button>
+            </div>
+          </div>
+          <p class="ing-compare"><span class="yr a">2026</span> <span class="ver">Vigente al 30/06/2026</span> <span class="arrow-sep" aria-hidden="true">→</span> <span class="yr b">2027</span> <span class="ver">Proyecto de Ley</span></p>
+        </div>
+        <div class="kpi-grid" id="ing-kpis"></div>
+        <p class="synthesis" id="ing-synthesis"></p>
+      </div>
+    </div>
+
+    <main class="wrap stack">
+      <section class="card" aria-labelledby="h-ing-rec">
+        <div class="card-head">
+          <h2 id="h-ing-rec">¿Qué recursos crecen y cuáles caen?</h2>
+          <div class="card-controls">
+            <label class="field inline"><span>Ordenar recursos por</span>
+              <select id="ing-order">
+                <option value="aumento_real">Mayor aumento real</option>
+                <option value="caida_real">Mayor caída real</option>
+                <option value="cambio_pesos">Mayor cambio en pesos</option>
+                <option value="monto">Mayor monto</option>
+              </select>
+            </label>
+            <label class="field inline"><span>Año de los montos</span>
+              <select id="ing-year">
+                <option value="2026">2026 · Vigente al 30/06/2026</option>
+                <option value="2027">2027 · Proyecto de Ley</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <p class="unit-line" id="ing-unit"></p>
+        <div class="evo-charts">
+          <figure class="evo-fig">
+            <figcaption id="ing-var-title">Variación 2026–2027</figcaption>
+            <div class="ing-chart" id="ing-var-box"><canvas id="ing-var" role="img" aria-label="Variación porcentual de cada recurso entre 2026 y 2027. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
+          <figure class="evo-fig">
+            <figcaption id="ing-amt-title">Monto por recurso</figcaption>
+            <div class="ing-chart" id="ing-amt-box"><canvas id="ing-amt" role="img" aria-label="Monto de cada recurso en el año elegido, con su participación en el total. La tabla de abajo tiene los mismos datos."></canvas></div>
+          </figure>
+        </div>
+        <div class="table-scroll"><table class="data-table" id="ing-table"></table></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-ing-bases">
+        <h2 id="h-ing-bases">Qué se compara</h2>
+        <p class="unit-line">Cada año tiene una base distinta: no se comparan dos ejecuciones ni dos recaudaciones.</p>
+        <div class="ing-bases" id="ing-bases"></div>
+        <dl class="ing-method" id="ing-method"></dl>
+      </section>
+    </main>
+  </div>
+</section>
+
 <footer class="site-footer">
   <div class="wrap"><p>Fuente: Gobierno de la Ciudad de Buenos Aires. 2023–2026: presupuesto Vigente. 2027: Proyecto de Ley de Presupuesto, crédito inicial (Planillas 3, 4 y 8). Variaciones reales calculadas a precios de 2027 con el IPC promedio de cada año.</p></div>
 </footer>
@@ -294,5 +363,6 @@
 <script src="chart.umd.min.js"></script>
 <script src="metrics.js"></script>
 <script src="app.js"></script>
+<script src="ingresos.js"></script>
 </body>
 </html>

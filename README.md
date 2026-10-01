@@ -65,6 +65,34 @@ Comuna 2 antes que Comuna 10). Donde tiene sentido se mantiene también el
 orden por tamaño del cambio en pesos. Se quitó el orden por cambio
 porcentual.
 
+### Pestaña Ingresos
+
+Cuarta pestaña, con **fuente propia e independiente** de las de gastos:
+`fuentes/ingresos_tributarios_caba_2026_2027.csv` (Mensaje del Proyecto de
+Presupuesto 2027, Cuadro 3.4 — Composición de los Recursos Tributarios). No
+usa `presupuesto.json`, `metrics.js` ni el estado de `app.js`; los archivos de
+gastos no se modificaron.
+
+- **Bases**: 2026 = *Vigente al 30/06/2026*; 2027 = *Proyecto de Ley*. Se
+  muestran en las tarjetas, en los encabezados de la tabla y en el recuadro
+  *Qué se compara*.
+- **Columnas**: `recurso_id` (clave estable), `recurso` (nombre visible),
+  `anio`, `monto_nominal` (modo nominal) y `monto_real_2027` (modo real, a
+  precios de 2027). A diferencia de gastos, acá los **montos** también cambian
+  con el modo: en real se ven a precios de 2027.
+- **Variación**: `(valor_2027 / valor_2026 − 1) × 100`, con los montos del
+  modo elegido.
+- **Orden**: mayor aumento real, mayor caída real (estos dos usan siempre la
+  variación real), mayor cambio en pesos (valor absoluto, en el modo elegido)
+  y mayor monto (del año elegido, en el modo elegido).
+- **Deflactores**: los mismos del tablero (IPC promedio 2026 = 2501,96; 2027 =
+  3020,12; factor 2026 a precios de 2027 = 1,2071016323). El build verifica que
+  coincidan con los de `presupuesto.json`.
+- **Advertencia** visible: la comparación enfrenta recursos vigentes al
+  30/06/2026 con los proyectados para 2027; no son recaudación efectivamente
+  percibida.
+- URL: `?tab=ingresos&modo=real&anio=2027&orden=aumento_real`.
+
 ## Estructura
 
 ```
@@ -74,6 +102,11 @@ porcentual.
 ├── metrics.js          → funciones puras de comparación (compartidas con las pruebas)
 ├── chart.umd.min.js    → Chart.js 4.4.4 vendorizado (sin CDN)
 ├── presupuesto.json    → datos generados por build_data.py (unos 270 KB)
+├── ingresos.js         → pestaña Ingresos (cálculos + interfaz), independiente de app.js
+├── ingresos.css        → estilos de la pestaña Ingresos
+├── ingresos.json       → datos de ingresos generados por build_ingresos.py (unos 7 KB)
+├── build_ingresos.py   → CSV de ingresos → ingresos.json, con validaciones
+├── test_ingresos.js    → pruebas de la pestaña Ingresos (Node)
 ├── build_data.py       → fuentes CSV → presupuesto.json, con validaciones
 ├── test_build.py       → pruebas del build (Python)
 ├── test_metrics.js     → pruebas de las métricas (Node)
@@ -97,6 +130,12 @@ porcentual.
      mismo resultado que el build completo.
 3. Corré las pruebas: `python3 test_build.py` y `node test_metrics.js`.
 4. Commiteá el `presupuesto.json` resultante.
+
+**Ingresos** (independiente de los pasos anteriores): reemplazá
+`fuentes/ingresos_tributarios_caba_2026_2027.csv`, corré
+`python3 build_ingresos.py` (falla si cambian las bases, los deflactores, los
+montos de control de Ingresos Brutos o si las variaciones del CSV no cumplen
+la fórmula), después `node test_ingresos.js`, y commiteá `ingresos.json`.
 
 ## Cómo funciona el Proyecto 2027
 

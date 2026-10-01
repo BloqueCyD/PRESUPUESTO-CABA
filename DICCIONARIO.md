@@ -178,3 +178,25 @@ filas). Columnas: `anio_a`, `tipo_a`, `anio_b`, `tipo_b`, id y etiqueta de
 cada dimensión, montos nominales de A y B, variación nominal y real
 (absoluta y porcentual; la real en pesos de 2027), participaciones, cambio
 en pp, estado, unidades y filtro aplicado.
+
+
+## Ingresos (`ingresos.json`)
+
+Fuente: `fuentes/ingresos_tributarios_caba_2026_2027.csv` (Cuadro 3.4 del
+Mensaje del Proyecto de Presupuesto CABA 2027). Es independiente de
+`presupuesto.json` y lo genera `build_ingresos.py`.
+
+| Campo CSV | Uso |
+|---|---|
+| `recurso_id` | Identificador estable de cada recurso (`recursos[].id`) |
+| `recurso` | Nombre visible |
+| `anio` | 2026 (Vigente al 30/06/2026) o 2027 (Proyecto de Ley) |
+| `monto_nominal` | Monto en el modo nominal (pesos corrientes de cada año) |
+| `monto_real_2027` | Monto en el modo real (pesos a precios de 2027) |
+| `origen`, `grupo_recurso` | Se muestran como contexto (fuente propia / origen nacional) |
+
+Variación 2026 → 2027: `(valor_2027 / valor_2026 − 1) × 100`, con
+`monto_nominal` o `monto_real_2027` según el modo. Deflactores: IPC promedio
+2026 = 2501,96, 2027 = 3020,12; factor 2026 = 3020,12 / 2501,96 =
+1,2071016323. Los montos son recursos vigentes o proyectados, **no
+recaudación percibida**.

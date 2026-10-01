@@ -1,5 +1,6 @@
 fuentes/*.csv
 !fuentes/presupuesto_2027_tablero.csv
+!fuentes/ingresos_tributarios_caba_2026_2027.csv
 __pycache__/
 *.pyc
 .DS_Store
