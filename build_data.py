@@ -70,7 +70,7 @@ FORBIDDEN_AMOUNT_COLUMNS = {"sancion", "sanción", "definitivo", "devengado"}
 # explícita. El Proyecto 2027 usa formato "cruces": una fila por celda de
 # cada cruce, identificado por la columna "cruce".
 # ---------------------------------------------------------------------------
-HIST_FILE = "presupuesto_caba_historico_real_2027_limpio.csv"
+HIST_FILE = "presupuesto_caba_historico_real_2027_comparable.csv"
 SOURCES = {
     2023: {"archivo": HIST_FILE, "tipo": "vigente", "columna_monto": "Vigente", "columna_anio": "anio"},
     2024: {"archivo": HIST_FILE, "tipo": "vigente", "columna_monto": "Vigente", "columna_anio": "anio"},

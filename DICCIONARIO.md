@@ -4,10 +4,10 @@
 
 | Período | Tipo | Archivo | Corte (`periodo_fuente`) | Columna de monto | Filas |
 |---|---|---|---|---|---|
-| 2023 | Vigente | `presupuesto_caba_historico_real_2027_limpio.csv` | T4 | `Vigente` | 51.007 |
-| 2024 | Vigente | ídem | T4 | `Vigente` | 48.514 |
-| 2025 | Vigente | ídem | T4 | `Vigente` | 45.444 |
-| 2026 | Vigente | ídem | T2 | `Vigente` | 38.756 |
+| 2023 | Vigente | `presupuesto_caba_historico_real_2027_comparable.csv` | T4 | `Vigente` | 50.999 |
+| 2024 | Vigente | ídem | T4 | `Vigente` | 48.511 |
+| 2025 | Vigente | ídem | T4 | `Vigente` | 45.439 |
+| 2026 | Vigente | ídem | T2 | `Vigente` | 38.751 |
 | 2027 | Proyecto | `presupuesto_2027_tablero.csv` | Crédito inicial (Proyecto de Ley) | `Credito_Inicial` | 776 (tres cruces) |
 
 El CSV también trae `Sanción`, `Definitivo`, `Devengado`, `IPC_promedio`,
@@ -18,14 +18,36 @@ especificación; la columna `Vigente_real_2027` del CSV coincide con ese
 cálculo (diferencia máxima por fila: 0,0001 pesos) y sirve como control
 independiente.
 
+### Base histórica comparable
+
+La base histórica es `presupuesto_caba_historico_real_2027_comparable.csv`:
+una copia de `presupuesto_caba_historico_real_2027_limpio.csv` (que se
+conserva como respaldo) con las mismas 49 columnas, en el mismo orden y con
+las filas retenidas idénticas byte a byte. El único cambio es que se
+eliminaron las 21 filas con `Fin = 9` y `Fun = 1` (*Gastos no clasificados*),
+que contienen amortización de deuda y aplicaciones financieras no comparables
+con el gasto presentado para 2027. Los demás componentes de los incisos 6 y 7
+se conservan.
+
+| Año | Filas excluidas | Vigente excluido |
+|---|---:|---:|
+| 2023 | 8 | $ 72.359.762.816 |
+| 2024 | 3 | $ 208.124.519.412 |
+| 2025 | 5 | $ 707.512.861.802 |
+| 2026 | 5 | $ 1.001.708.004.139 |
+
+Filas: 183.721 en el original, 183.700 en la base comparable.
+SHA-256 original: `eddd83702d5cbbe307da0ab279d4e33cce5b94a4536d49ea22dd3d857d3f96a6`.
+SHA-256 comparable: `71dd5432dda43c6ded8c04ffe4b57b9b806d4f98e5256b6318c354e34c179680`.
+
 Totales nominales de la fuente (columna `Vigente`):
 
 | Año | Vigente nominal | Vigente real a precios de 2027 |
 |---|---|---|
-| 2023 | $ 3.203.970.252.965 | $ 24.363.920.436.058 |
-| 2024 | $ 10.411.643.914.333 | $ 24.275.214.824.450 |
-| 2025 | $ 14.752.026.974.205 | $ 23.493.775.848.245 |
-| 2026 | $ 20.878.860.043.433 | $ 25.202.906.039.414 |
+| 2023 | $ 3.131.610.490.149 | $ 23.813.675.781.823 |
+| 2024 | $ 10.203.519.394.921 | $ 23.789.963.171.538 |
+| 2025 | $ 14.044.514.112.403 | $ 22.367.005.363.484 |
+| 2026 | $ 19.877.152.039.294 | $ 23.993.742.672.510 |
 | 2027 | $ 24.094.340.599.263 | $ 24.094.340.599.263 (factor 1) |
 
 ### Proyecto 2027 (formato cruces)

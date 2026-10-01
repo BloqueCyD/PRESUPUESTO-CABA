@@ -8,7 +8,9 @@ categorías aparecen o desaparecen.
 
 Construido según el documento *Especificaciones para rearmar el tablero de
 Presupuesto CABA* (v1.0, 30/9/2026), con dos fuentes de datos:
-`presupuesto_caba_historico_real_2027_limpio.csv` (Vigente 2023–2026) y
+`presupuesto_caba_historico_real_2027_comparable.csv` (Vigente 2023–2026,
+sin las filas de *Gastos no clasificados*, `Fin = 9` y `Fun = 1`; ver
+`DICCIONARIO.md`) y
 `presupuesto_2027_tablero.csv` (Proyecto de Ley 2027, crédito inicial).
 
 ## Cómo se leen los números
@@ -81,7 +83,7 @@ porcentual.
 
 ## Cómo actualizar los datos
 
-1. Copiá `presupuesto_caba_historico_real_2027_limpio.csv` en `fuentes/`.
+1. Copiá `presupuesto_caba_historico_real_2027_comparable.csv` en `fuentes/`.
    Pesa unos 130 MB: GitHub rechaza archivos de más de 100 MB, por eso
    `fuentes/*.csv` está en `.gitignore` (salvo `presupuesto_2027_tablero.csv`,
    que pesa unos 100 KB y sí se versiona). El sitio publicado sólo necesita
