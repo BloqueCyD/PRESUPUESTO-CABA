@@ -310,20 +310,12 @@
   }
 
   function renderBases() {
-    const mt = DATA.meta, f = mt.factor_a_precios_2027, ipc = mt.ipc_average;
+    const mt = DATA.meta;
     $('ing-bases').innerHTML = `
       <div class="ing-base a"><p class="ing-base-y">${chip(Y0)}</p><p class="ing-base-t">${esc(mt.bases[Y0])}</p>
         <p class="ing-base-d">Recursos vigentes informados por el GCBA a esa fecha.</p></div>
       <div class="ing-base b"><p class="ing-base-y">${chip(Y1)}</p><p class="ing-base-t">${esc(mt.bases[Y1])}</p>
         <p class="ing-base-d">Recursos proyectados en el Proyecto de Ley de Presupuesto ${Y1}.</p></div>`;
-    $('ing-method').innerHTML = `
-      <dt>IPC promedio ${Y0}</dt><dd>${nf(ipc[Y0], 2)}</dd>
-      <dt>IPC promedio ${Y1}</dt><dd>${nf(ipc[Y1], 2)}</dd>
-      <dt>Factor ${Y0} a precios de ${Y1}</dt><dd>${nf(f[Y0], 10)}</dd>
-      <dt>Variación</dt><dd>(valor ${Y1} / valor ${Y0} − 1) × 100</dd>
-      <dt>Modo nominal</dt><dd><code>monto_nominal</code></dd>
-      <dt>Modo real</dt><dd><code>monto_real_2027</code></dd>
-      <dt>Fuente</dt><dd class="txt">${esc(mt.fuente_documento)}, ${esc(mt.cuadro_fuente)} (pág. ${esc(mt.pagina_documento)} del documento, ${esc(mt.pagina_pdf)} del PDF). Unidad de origen: ${esc(mt.unidad_fuente).toLowerCase()}, con precisión de ${esc(mt.precision_fuente)}.</dd>`;
   }
 
   /* ---- eventos ---- */

@@ -35,15 +35,9 @@ body.ver-ingresos #proyecto-note{display:none!important}
 .ing-base-t{font-family:var(--serif);font-weight:600;font-size:21px;margin:6px 0 4px!important;color:var(--ink)}
 .ing-base-d{font-size:13.5px;color:var(--ink-soft)}
 
-.ing-method{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 18px;margin:0;font-size:13.5px;max-width:90ch}
-.ing-method dt{color:var(--ink-soft)}
-.ing-method dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
-.ing-method dd.txt{font-family:var(--sans)}
 
 @media (max-width:760px){
   .ing-bases{grid-template-columns:minmax(0,1fr)}
-  .ing-method{grid-template-columns:minmax(0,1fr)}
-  .ing-method dd{margin-bottom:6px}
 }
 
 #ing-kpis .full{word-break:normal;overflow-wrap:anywhere}
