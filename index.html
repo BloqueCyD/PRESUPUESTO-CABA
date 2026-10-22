@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="ingresos.css">
+<link rel="stylesheet" href="programas.css">
 </head>
 <body>
 
@@ -70,6 +71,7 @@
   <button type="button" role="tab" id="tab-comparacion" aria-controls="panel-comparacion" data-tab="comparacion" aria-selected="true">Comparación entre dos años</button>
   <button type="button" role="tab" id="tab-evolucion" aria-controls="panel-evolucion" data-tab="evolucion" aria-selected="false">Evolución <span class="js-range">2023–2026</span></button>
   <button type="button" role="tab" id="tab-comunas" aria-controls="panel-comunas" data-tab="comunas" aria-selected="false">Comunas</button>
+  <button type="button" role="tab" id="tab-programas" aria-controls="panel-programas" data-tab="programas" aria-selected="false">Programas</button>
   <button type="button" role="tab" id="tab-ingresos" aria-controls="panel-ingresos" data-tab="ingresos" aria-selected="false">Ingresos</button>
 </nav>
 
@@ -355,6 +357,90 @@
   </div>
 </section>
 
+<!-- ===================== PROGRAMAS (fuente independiente: programas.json) ===================== -->
+<section id="panel-programas" role="tabpanel" aria-labelledby="tab-programas" hidden>
+  <p id="prg-status" class="status wrap" role="status" aria-live="polite">Cargando programas…</p>
+  <div id="prg-body" hidden>
+    <div class="kpis">
+      <div class="wrap">
+        <p class="prg-warning" role="note"><strong>Qué se compara.</strong> El Proyecto de Ley 2027 (cuadernillos por jurisdicción, programa por fuente de financiamiento) frente al crédito vigente al 30/06/2026, programa por programa. Los totales coinciden al peso con los de las otras pestañas para Vigente 2026 y Proyecto 2027. La amortización de la deuda y las aplicaciones financieras quedan fuera del gasto comparable, como en el resto del tablero.</p>
+        <div class="prg-controls">
+          <div class="field inline">
+            <span id="prg-mode-label">Variaciones</span>
+            <div class="seg" role="radiogroup" aria-labelledby="prg-mode-label" id="prg-mode-seg">
+              <button type="button" role="radio" data-mode="real" aria-checked="true">Reales</button>
+              <button type="button" role="radio" data-mode="nominal" aria-checked="false">Nominales</button>
+            </div>
+          </div>
+          <label class="field inline grow prg-jur-field"><span>Jurisdicción</span><select id="prg-jur"></select></label>
+          <p class="prg-compare"><span class="yr a">Vigente 2026</span> <span class="ver">al 30/06/2026</span> <span class="arrow-sep" aria-hidden="true">→</span> <span class="yr b">Proyecto 2027</span> <span class="ver">Proyecto de Ley</span></p>
+        </div>
+        <div class="kpi-grid" id="prg-kpis"></div>
+        <p class="synthesis" id="prg-synthesis"></p>
+        <p class="filter-line" id="prg-filter-line" hidden></p>
+      </div>
+    </div>
+
+    <main class="wrap stack">
+      <section class="card" aria-labelledby="h-prg-rank">
+        <div class="card-head">
+          <h2 id="h-prg-rank">¿Qué programas explican el cambio?</h2>
+        </div>
+        <p class="unit-line" id="prg-rank-unit"></p>
+        <div class="rank-grid">
+          <div><h3 class="rank-title up">Mayores aumentos <span class="count" id="prg-up-count"></span></h3><ol class="rank-list" id="prg-up"></ol></div>
+          <div><h3 class="rank-title down">Mayores caídas <span class="count" id="prg-down-count"></span></h3><ol class="rank-list" id="prg-down"></ol></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prg-ab">
+        <h2 id="h-prg-ab">Programas nuevos y suprimidos</h2>
+        <p class="unit-line" id="prg-ab-unit"></p>
+        <div class="rank-grid">
+          <div><h3 class="rank-title new">Nuevos en 2027 <span class="count" id="prg-new-count"></span></h3><ul class="plain-list prg-ab" id="prg-new"></ul></div>
+          <div><h3 class="rank-title gone">Suprimidos en 2027 <span class="count" id="prg-gone-count"></span></h3><ul class="plain-list prg-ab" id="prg-gone"></ul></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prg-fte">
+        <h2 id="h-prg-fte">¿Con qué fuentes se financia el Proyecto 2027?</h2>
+        <p class="unit-line" id="prg-fte-unit"></p>
+        <div class="evo-charts">
+          <figure class="evo-fig">
+            <figcaption>Crédito por fuente de financiamiento <span class="muted">(pesos corrientes de 2027)</span></figcaption>
+            <div class="prg-fte-chart"><canvas id="prg-fte-chart" role="img" aria-label="Crédito 2027 por fuente de financiamiento, con su participación en el total. La tabla de al lado tiene los mismos datos."></canvas></div>
+          </figure>
+          <div class="table-scroll"><table class="data-table" id="prg-fte-table"></table></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prg-table">
+        <div class="card-head">
+          <h2 id="h-prg-table">Tabla de programas</h2>
+          <button type="button" class="btn" id="prg-export">Descargar CSV</button>
+        </div>
+        <div class="cross-controls">
+          <label class="field inline grow"><span>Buscar</span><input type="search" id="prg-search" placeholder="Nombre o número de programa" autocomplete="off"></label>
+          <label class="field inline"><span>Estado</span>
+            <select id="prg-estado"><option value="">Todos</option><option value="continua">Continúa</option><option value="nuevo">Nuevo en 2027</option><option value="suprimido">Suprimido en 2027</option></select>
+          </label>
+          <label class="field inline"><span>Ordenar por</span>
+            <select id="prg-order"><option value="abs">Mayor cambio en pesos</option><option value="up">Mayor aumento</option><option value="down">Mayor caída</option><option value="desc">Asignación: mayor a menor</option><option value="asc">Asignación: menor a mayor</option><option value="codigo">Código de programa</option><option value="alfa">Alfabético (A–Z)</option></select>
+          </label>
+        </div>
+        <p class="unit-line" id="prg-table-unit"></p>
+        <div class="table-scroll table-tall"><table class="data-table" id="prg-table"></table></div>
+      </section>
+
+      <section class="card" aria-labelledby="h-prg-fuera" id="prg-fuera-card">
+        <h2 id="h-prg-fuera">Fuera del gasto comparable</h2>
+        <p class="unit-line">Filas de los cuadernillos 2027 que el Proyecto presenta fuera del total de gasto (amortización de la deuda y aplicaciones financieras). No entran en los totales ni en las variaciones, igual que en las otras pestañas.</p>
+        <div class="table-scroll"><table class="data-table" id="prg-fuera"></table></div>
+      </section>
+    </main>
+  </div>
+</section>
+
 <footer class="site-footer">
   <div class="wrap"><p>Fuente: Gobierno de la Ciudad de Buenos Aires. 2023–2026: presupuesto Vigente. 2027: Proyecto de Ley de Presupuesto, crédito inicial (Planillas 3, 4 y 8). Variaciones reales calculadas a precios de 2027 con el IPC promedio de cada año.</p></div>
 </footer>
@@ -363,5 +449,6 @@
 <script src="metrics.js"></script>
 <script src="app.js"></script>
 <script src="ingresos.js"></script>
+<script src="programas.js"></script>
 </body>
 </html>

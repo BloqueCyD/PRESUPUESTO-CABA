@@ -93,6 +93,50 @@ gastos no se modificaron.
   percibida.
 - URL: `?tab=ingresos&modo=real&anio=2027&orden=aumento_real`.
 
+### Pestaña Programas
+
+Quinta pestaña (entre Comunas e Ingresos), con **fuente propia**:
+`fuentes/Consolidado_Jurisdicciones_2027.csv` (una fila por jurisdicción ×
+programa: cuadernillos "Planillas desagregadas" del Proyecto de Ley 2027 frente
+al crédito vigente al 30/06/2026). No usa `metrics.js` ni el estado de `app.js`;
+los archivos de gastos y de ingresos no se modificaron (sólo se agregó el botón,
+el panel y los `<link>`/`<script>` en `index.html`).
+
+- **Totales**: el build verifica que la suma de programas de cada jurisdicción
+  coincida **al peso** con `presupuesto.json` (Vigente 2026 y Proyecto 2027), así
+  que la pestaña no cambia ninguna comparación existente. Total comparable:
+  2026 = $ 19.877.152.039.294; 2027 = $ 24.094.340.599.263.
+- **Convención** (la del resto del tablero): montos siempre nominales; variación
+  real en pesos de 2027 = `proyecto_2027 − vigente_2026 × factor`, con el factor
+  exacto de `presupuesto.json` (3020,12 / 2501,96).
+- **Columnas del CSV que no se muestran**: `variacion_real_2027_pesos`,
+  `var_pct_real` y `contribucion_pp_real_jur` están calculadas como
+  `(2027 ÷ 1,2071) − 2026`, es decir en pesos de 2026 y con el factor
+  redondeado (los montos en pesos difieren un 20,7 % de la convención del
+  tablero; los porcentajes, en millonésimas). La página las recalcula con la
+  convención del tablero a partir de los montos nominales del CSV. El build
+  igual controla que sean coherentes con su propia fórmula.
+- **Qué muestra**: tarjetas (total Vigente 2026, Proyecto 2027, variación
+  nominal y real), mayores aumentos y caídas por programa (sólo los que
+  continúan), programas nuevos y suprimidos con las observaciones del
+  consolidado, crédito 2027 por fuente de financiamiento (sólo existe para 2027),
+  tabla completa con búsqueda, filtro por estado, orden y descarga en CSV, y las
+  dos filas fuera del gasto comparable (amortización 98/17 y aplicaciones
+  financieras 99/95), que no entran en los totales.
+- **Aporte (pp)**: variación del programa ÷ vigente 2026 del recorte × 100, en el
+  modo elegido (en real, el vigente a precios de 2027). Suma la variación % del
+  recorte. Es distinto de la "contribución" de la pestaña Comparación (parte del
+  cambio total).
+- **Estados**: los del CSV (`comparable` → Continúa, `nuevo 2027`, `suprimido
+  2027`, `fuera del gasto comparable`). Seis programas suprimidos tienen fila en
+  el vigente 2026 con $ 0; se muestran como vienen.
+- URL: `?tab=programas&modo=real&pjur=55&porden=desc` (`pjur`/`porden` para no
+  chocar con el filtro `jur` de gastos ni con `orden` de Ingresos).
+- Actualizar: reemplazá el CSV, corré `python3 build_programas.py` y
+  `node test_programas.js`, y commiteá `programas.json`. El script
+  `build_consolidado_jurisdicciones.py` que genera el CSV necesita la base
+  `presupuesto_2027.db`, que no forma parte de este repositorio.
+
 ## Estructura
 
 ```
@@ -105,6 +149,11 @@ gastos no se modificaron.
 ├── ingresos.js         → pestaña Ingresos (cálculos + interfaz), independiente de app.js
 ├── ingresos.css        → estilos de la pestaña Ingresos
 ├── ingresos.json       → datos de ingresos generados por build_ingresos.py (unos 7 KB)
+├── programas.js        → pestaña Programas (cálculos + interfaz), independiente de app.js
+├── programas.css       → estilos de la pestaña Programas
+├── programas.json      → datos por programa generados por build_programas.py (unos 106 KB)
+├── build_programas.py  → CSV consolidado → programas.json, con validaciones
+├── test_programas.js   → pruebas de la pestaña Programas (Node)
 ├── build_ingresos.py   → CSV de ingresos → ingresos.json, con validaciones
 ├── test_ingresos.js    → pruebas de la pestaña Ingresos (Node)
 ├── build_data.py       → fuentes CSV → presupuesto.json, con validaciones

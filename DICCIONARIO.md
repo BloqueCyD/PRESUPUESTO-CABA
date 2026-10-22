@@ -180,6 +180,35 @@ cada dimensión, montos nominales de A y B, variación nominal y real
 en pp, estado, unidades y filtro aplicado.
 
 
+## Programas (`programas.json`, schema `programas-1`)
+
+Fuente: `fuentes/Consolidado_Jurisdicciones_2027.csv` (481 filas, una por
+jurisdicción × programa). Lo genera `build_programas.py`.
+
+| Campo CSV | Uso en `programas.json` |
+|---|---|
+| `jur`, `jur_nombre` | `programas[].jur` y `jurisdicciones[]` (nombre tal como viene en el CSV) |
+| `prog`, `programa` | `prog`, `nombre` |
+| `ues_2027` | `ues` |
+| `fte11` … `fte22` | `fte` (6 valores, sólo 2027; `null` en los suprimidos) |
+| `vigente_2026_30_06_pesos` | `v26` (sin cambios) |
+| `proyecto_2027_pesos` | `p27` (sin cambios) |
+| `estado` | `estado` (`continua`, `nuevo`, `suprimido`, `fuera`) y `estado_csv` |
+| `observacion` | `obs` (sin cambios) |
+| `variacion_*`, `var_pct_*`, `contribucion_pp_real_jur` | No se publican: se controlan en el build y se recalculan en la página |
+
+```
+variacion_nominal = p27 − v26                 variacion_nominal_pct = (p27 / v26 − 1) × 100
+variacion_real    = p27 − v26 × factor        variacion_real_pct    = (p27 / (v26 × factor) − 1) × 100
+factor            = 3020,12 / 2501,96 (meta.factor_a_precios_2027 de presupuesto.json)
+aporte_pp(modo)   = variacion(modo) del programa / base(modo) del recorte × 100
+```
+
+Controles del build: sin filas repetidas, fuentes = proyecto 2027 en cada
+fila, totales comparables 2026 y 2027, filas "fuera" sin vigente, columnas de
+variación del CSV coherentes con su fórmula (factor 1,2071) y totales por
+jurisdicción iguales a `presupuesto.json` (tolerancia 0,01 pesos).
+
 ## Ingresos (`ingresos.json`)
 
 Fuente: `fuentes/ingresos_tributarios_caba_2026_2027.csv` (Cuadro 3.4 del
